@@ -2,3 +2,8 @@
 node_modules/
 dist/
 coverage/
+
+# Local AI-agent logs and temporary state
+.codex/logs/
+.codex/tmp/
+.agents/

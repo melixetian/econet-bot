@@ -1,6 +1,6 @@
 # Prompt for Codex
 
-Implement the project defined in `telegram-llm-bot-spec.md` in the current repository.
+Implement the project defined in `Spec.md` in the current repository.
 
 Treat the specification as the source of truth. First inspect the repository and preserve any relevant existing work. Then implement the smallest complete solution that satisfies every requirement and acceptance criterion. Do not expand the scope or introduce unnecessary abstractions or dependencies.
 
