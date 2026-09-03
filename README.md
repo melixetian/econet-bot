@@ -1,2 +1,2 @@
-# econet_bot
+# econet-bot
 Econet agentic bot
