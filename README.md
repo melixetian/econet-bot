@@ -88,6 +88,9 @@ The application deliberately has no conversation memory, database, cache, or
 persistent storage. Only the current Telegram message is sent as an Ollama prompt;
 earlier messages and model replies are never included.
 
+Ollama thinking output is disabled for predictable response time on local CPU
+hardware; the bot returns only the model's final answer.
+
 To add an inference backend, implement `InferenceProvider` in
 `src/inference/providers/provider.ts`, add the provider implementation under that
 directory, and register it in `src/inference/providers/factory.ts`. Provider

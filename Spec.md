@@ -109,7 +109,8 @@ Call:
 {
   "model": "<OLLAMA_MODEL>",
   "prompt": "<the current Telegram message only>",
-  "stream": false
+  "stream": false,
+  "think": false
 }
 ```
 
@@ -118,6 +119,7 @@ Read the generated answer from the response's `response` string.
 The provider must:
 
 - never send earlier Telegram messages or model replies;
+- disable thinking output so only the final answer consumes the request timeout;
 - handle connection failures, timeouts, non-2xx responses, invalid JSON, and a missing/non-string `response` field;
 - return a non-empty string or throw an `Error`;
 - avoid logging prompts, generated text, tokens, or secrets.
@@ -272,4 +274,3 @@ The implementation is complete when all of the following are true:
 - Do not introduce frameworks, dependency injection containers, databases, queues, Docker, or generic abstractions beyond the provider boundary and worker protocol.
 - Do not expand the product scope.
 - Never commit or print the Telegram token.
-

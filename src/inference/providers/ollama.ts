@@ -23,7 +23,12 @@ export class OllamaProvider implements InferenceProvider {
       const request: RequestInit = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: this.model, prompt, stream: false }),
+        body: JSON.stringify({
+          model: this.model,
+          prompt,
+          stream: false,
+          think: false,
+        }),
       };
       if (signal) {
         request.signal = signal;

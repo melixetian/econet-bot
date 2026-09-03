@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { OllamaProvider } from "../src/inference/providers/ollama.js";
 
 describe("OllamaProvider", () => {
-  it("sends exactly one prompt with streaming disabled and parses success", async () => {
+  it("sends exactly one prompt with streaming and thinking disabled", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ response: "model answer" }), {
         status: 200,
@@ -28,6 +28,7 @@ describe("OllamaProvider", () => {
           model: "qwen3:1.7b",
           prompt: "current message only",
           stream: false,
+          think: false,
         }),
       }),
     );
