@@ -2,6 +2,10 @@
 node_modules/
 dist/
 coverage/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+agent-workspace/
 
 # Local AI-agent logs and temporary state
 .codex/logs/

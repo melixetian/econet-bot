@@ -1,98 +1,70 @@
-# Telegram LLM Bot
+# Econet Bot
 
-A minimal Telegram bot that sends each text message independently to a local
-Ollama model and replies with the generated text.
+A minimal TypeScript Telegram AI agent backed by a local Ollama model. It keeps a separate conversation per Telegram chat, can start over with `/new`, and can use one `exec` shell tool for fresh data or explicitly authorized actions.
 
-## Prerequisites
+## Prerequisites and setup
 
-- Node.js 20 or newer and npm
-- [Ollama](https://ollama.com/) installed
-- A Telegram bot token obtained from BotFather
-- The configured Ollama model (the default is `qwen3:1.7b`)
-
-## Setup
-
-Install dependencies:
+- Node.js 20+ and npm
+- [Ollama](https://ollama.com/) with a model that supports native tool calling (the default is `qwen3:1.7b`)
+- A Telegram bot token from BotFather
+- Your Telegram numeric user ID. Send a message to a bot such as `@userinfobot`, or inspect an update through Telegram's Bot API; do not use a username.
 
 ```sh
 npm install
-```
-
-Copy the example environment file and add your Telegram token:
-
-```sh
 cp .env.example .env
-```
-
-```dotenv
-TELEGRAM_BOT_TOKEN=your-real-token
-INFERENCE_PROVIDER=ollama
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=qwen3:1.7b
-LLM_TIMEOUT_MS=60000
-```
-
-Never commit `.env`; it contains a secret and is intentionally ignored by Git.
-
-Pull the configured model:
-
-```sh
 ollama pull qwen3:1.7b
 ```
 
-Start Ollama if your platform does not already run it as a background service:
+Set `TELEGRAM_BOT_TOKEN` and a comma-separated `ALLOWED_TELEGRAM_USER_IDS` list in `.env`. The allowlist is mandatory and is checked against message sender IDs, not chat IDs.
 
-```sh
-ollama serve
-```
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TELEGRAM_BOT_TOKEN` | none | Required Telegram token |
+| `ALLOWED_TELEGRAM_USER_IDS` | none | Required authorized sender IDs |
+| `INFERENCE_PROVIDER` | `ollama` | Worker-side provider |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama service URL |
+| `OLLAMA_MODEL` | `qwen3:1.7b` | Tool-capable local model |
+| `LLM_TIMEOUT_MS` | `60000` | Per Ollama call timeout |
+| `AGENT_TIMEOUT_MS` | `300000` | Whole agent-run timeout |
+| `AGENT_MAX_STEPS` | `5` | Model calls per run (1–10) |
+| `EXEC_TIMEOUT_MS` | `30000` | Per-command timeout |
+| `CHAT_HISTORY_MESSAGES` | `20` | Persisted messages supplied as context |
+| `CHAT_DB_PATH` | `./data/chat-history.sqlite` | SQLite conversation store |
+| `SKILLS_DIR` | `./skills` | Directory containing `*/SKILL.md` files |
+| `AGENT_WORKSPACE_DIR` | `./agent-workspace` | Initial shell working directory |
 
-## Run and verify
+`.env` must never be committed.
 
-For development, run the TypeScript entry point:
+## Run and validate
+
+Start Ollama if your platform does not run it in the background, then use either:
 
 ```sh
 npm run dev
 ```
-
-For a compiled run:
 
 ```sh
 npm run build
 npm start
 ```
 
-Then send the bot `/start` or `/help`, followed by a normal text message. The
-commands return help without invoking Ollama. A normal message should receive a
-model-generated reply. Non-text updates and whitespace-only messages are ignored.
-
-Run static type checking and the unit tests with:
+Validate the repository with:
 
 ```sh
 npm run typecheck
 npm test
 ```
 
-Tests mock network and process boundaries; they do not need a Telegram token,
-Ollama process, or downloaded model.
+## Behavior and manual checks
 
-## Architecture
+`/start` and `/help` describe the bot without model usage. `/new` removes stored history only for the current Telegram chat. Other commands are ignored. Normal non-empty text messages are processed sequentially, preserving each chat's recent user and final assistant messages in SQLite.
 
-The bot and inference worker are separate, long-lived operating-system processes.
-The bot owns Telegram long polling and the worker lifecycle. It sends independent
-requests over JSONL on the worker's standard input and correlates JSONL responses
-from standard output. Provider logs use standard error so they cannot corrupt the
-protocol. Each request has its own timeout, and the next request lazily restarts a
-worker that exited.
+The worker starts with two local Skills: weather via `wttr.in`, and fiat exchange rates via Frankfurter. For a direct answer, send “Explain photosynthesis briefly.” For a tool call, send “What is the weather in Amsterdam?” or “Convert 10 EUR to USD.” Then send a contextual follow-up such as “What about tomorrow?” Finally send `/new` and verify that the prior context is no longer used.
 
-The application deliberately has no conversation memory, database, cache, or
-persistent storage. Only the current Telegram message is sent as an Ollama prompt;
-earlier messages and model replies are never included.
+The Telegram process handles access, commands, replies, chunking, and worker lifecycle. The worker process owns JSONL requests, SQLite history, Skills, the bounded model → tool → model loop, and command execution. Ollama remains an HTTP-only provider; it receives chat messages and the one `exec` tool definition.
 
-Ollama thinking output is disabled for predictable response time on local CPU
-hardware; the bot returns only the model's final answer.
+`CHAT_DB_PATH` and `AGENT_WORKSPACE_DIR` are runtime locations and are ignored by Git, together with SQLite WAL/SHM files.
 
-To add an inference backend, implement `InferenceProvider` in
-`src/inference/providers/provider.ts`, add the provider implementation under that
-directory, and register it in `src/inference/providers/factory.ts`. Provider
-selection remains confined to the worker and is controlled by
-`INFERENCE_PROVIDER`.
+## Security warning
+
+**`exec` runs commands through the host shell. `AGENT_WORKSPACE_DIR` is only an initial directory, not a security sandbox.** The mandatory Telegram allowlist limits who may reach the agent, but it is not a complete safety boundary. Run the bot under a low-privilege account or in a container, and authorize destructive, irreversible, or privileged actions only with care. Commands receive a minimal environment without the bot token or application configuration, but shell access still has the operating-system permissions of the bot process.

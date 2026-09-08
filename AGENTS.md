@@ -2,12 +2,11 @@
 
 ## Project and sources of truth
 
-This educational project is a minimal TypeScript/Node.js Telegram bot that sends
-each eligible text message to a local Ollama model and returns the result. The
-current product scope is long-polled text messages plus `/start` and `/help`;
-streaming, persistence, other media, and production infrastructure are out of
-scope. The canonical requirements, externally observable behavior, architecture,
-configuration, constraints, and acceptance criteria are in [Spec.md](Spec.md).
+This educational project is a minimal TypeScript/Node.js Telegram AI agent. It
+uses long polling, per-chat SQLite history, a bounded Ollama tool-calling loop,
+and one universal shell tool. The canonical requirements, externally observable
+behavior, architecture, configuration, constraints, and acceptance criteria are
+in [Spec.md](Spec.md).
 User setup and operation are documented in [README.md](README.md).
 
 Keep `AGENTS.md`, `Spec.md`, and `README.md` mutually consistent. Do not duplicate
@@ -17,8 +16,9 @@ the full specification here.
 
 - The Telegram bot and inference worker must remain separate OS processes that
   communicate through the JSONL protocol defined in `Spec.md`.
-- Message handling is stateless. Never store, reconstruct, or send conversation
-  history; each request contains only the current message.
+- Message handling retains only the specified per-chat user/final-assistant
+  SQLite history. Never persist system prompts, Skills, tool calls/results,
+  commands, failed turns, or secrets.
 - `InferenceProvider` is the replaceable inference plugin boundary. Provider
   selection and provider implementations belong to the worker side.
 - Telegram code may depend on the inference client abstraction, but must not

@@ -20,9 +20,9 @@ async function main(): Promise<void> {
       : [];
   const inference = new InferenceWorkerClient(
     createNodeWorkerFactory(workerPath, workerRunnerArguments),
-    config.llmTimeoutMs,
+    config.agentTimeoutMs,
   );
-  const bot = createBot(config.telegramBotToken, inference);
+  const bot = createBot(config.telegramBotToken, config.allowedTelegramUserIds, inference);
   let stopping = false;
 
   const shutdown = async (): Promise<void> => {

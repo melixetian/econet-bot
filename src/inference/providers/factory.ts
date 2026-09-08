@@ -9,6 +9,7 @@ const providerFactories: Readonly<Record<string, ProviderFactory>> = {
     new OllamaProvider({
       baseUrl: config.ollamaBaseUrl,
       model: config.ollamaModel,
+      timeoutMs: config.llmTimeoutMs,
     }),
 };
 

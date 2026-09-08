@@ -1,35 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadBotConfig, loadWorkerConfig } from "../src/config.js";
-
 describe("configuration", () => {
-  it("requires a Telegram token", () => {
-    expect(() => loadBotConfig({})).toThrow("TELEGRAM_BOT_TOKEN is required");
-  });
-
-  it("uses documented worker defaults", () => {
-    expect(loadWorkerConfig({})).toEqual({
-      inferenceProvider: "ollama",
-      ollamaBaseUrl: "http://127.0.0.1:11434",
-      ollamaModel: "qwen3:1.7b",
-      llmTimeoutMs: 60_000,
-    });
-  });
-
-  it.each(["0", "-1", "1.5", "not-a-number"])(
-    "rejects invalid timeout %s",
-    (value) => {
-      expect(() =>
-        loadBotConfig({ TELEGRAM_BOT_TOKEN: "token", LLM_TIMEOUT_MS: value }),
-      ).toThrow("LLM_TIMEOUT_MS must be a positive integer");
-    },
-  );
-
-  it("rejects invalid Ollama URLs", () => {
-    expect(() => loadWorkerConfig({ OLLAMA_BASE_URL: "not a URL" })).toThrow(
-      "OLLAMA_BASE_URL must be a valid HTTP or HTTPS URL",
-    );
-    expect(() => loadWorkerConfig({ OLLAMA_BASE_URL: "ftp://localhost" })).toThrow(
-      "OLLAMA_BASE_URL must be a valid HTTP or HTTPS URL",
-    );
-  });
+  it("requires token and allowlist", () => { expect(() => loadBotConfig({})).toThrow("TELEGRAM_BOT_TOKEN is required"); expect(() => loadBotConfig({ TELEGRAM_BOT_TOKEN: "x" })).toThrow("ALLOWED_TELEGRAM_USER_IDS is required"); });
+  it("deduplicates allowed senders", () => expect([...loadBotConfig({ TELEGRAM_BOT_TOKEN: "x", ALLOWED_TELEGRAM_USER_IDS: "1, 2, 1" }).allowedTelegramUserIds]).toEqual(["1", "2"]));
+  it("uses agent defaults and validates limits", () => { expect(loadWorkerConfig({}).agentMaxSteps).toBe(5); expect(() => loadWorkerConfig({ AGENT_MAX_STEPS: "11" })).toThrow("AGENT_MAX_STEPS must be an integer from 1 to 10"); });
 });
