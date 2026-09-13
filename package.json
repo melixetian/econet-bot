@@ -11,19 +11,24 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "evaluate": "tsx scripts/evaluate-rag.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.3.0",
     "dotenv": "^16.4.7",
-    "grammy": "^1.35.0"
+    "grammy": "^1.35.0",
+    "mammoth": "^1.12.3",
+    "pdfjs-dist": "^4.10.38",
+    "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.7",
     "@types/node-fetch": "^2.6.12",
+    "jszip": "^3.10.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "vitest": "^3.0.5"
+    "vitest": "^3.2.7"
   }
 }

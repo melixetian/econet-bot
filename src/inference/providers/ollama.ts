@@ -8,7 +8,7 @@ export class OllamaProvider implements InferenceProvider {
     let response: Response;
     const timeoutSignal = AbortSignal.timeout(this.timeoutMs); const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
     try { response = await this.fetchImplementation(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: this.model, messages, tools, stream: false, think: false }), signal: requestSignal }); }
-    catch { if (signal?.aborted) throw new Error("Ollama request timed out"); throw new Error("Could not connect to Ollama"); }
+    catch { if (requestSignal.aborted) throw new Error("Ollama request timed out"); throw new Error("Could not connect to Ollama"); }
     if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}`);
     let body: unknown; try { body = await response.json(); } catch { throw new Error("Ollama returned invalid JSON"); }
     if (!isRecord(body) || !isRecord(body.message)) throw new Error("Ollama returned an invalid response");

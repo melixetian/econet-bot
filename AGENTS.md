@@ -4,7 +4,8 @@
 
 This educational project is a minimal TypeScript/Node.js Telegram AI agent. It
 uses long polling, per-chat SQLite history, a bounded Ollama tool-calling loop,
-and one universal shell tool. The canonical requirements, externally observable
+document RAG backed by SQLite/sqlite-vec, a native document-search tool, and one
+universal shell tool. The canonical requirements, externally observable
 behavior, architecture, configuration, constraints, and acceptance criteria are
 in [Spec.md](Spec.md).
 User setup and operation are documented in [README.md](README.md).
@@ -25,6 +26,9 @@ the full specification here.
   import or call Ollama or another provider directly.
 - Provider code must remain independent of Telegram. IPC framing and correlation
   belong in the protocol/client/worker layer, not in providers.
+- Telegram derives document ownership from the validated sender. The worker owns
+  extraction, embeddings, storage, and retrieval, and vector KNN queries filter
+  that trusted user ID inside the query.
 - Preserve these dependency directions and existing behavior unless the task
   explicitly changes them.
 
@@ -34,6 +38,7 @@ Commands are defined in `package.json`:
 
 - `npm run typecheck` — type-check without emitting files.
 - `npm test` — run the Vitest suite once. Agents must not run this command.
+- `npm run evaluate` — run deterministic RAG retrieval evaluation. Agents must not run it.
 - `npm run build` — compile application sources to `dist/`.
 - `npm run dev` — run the TypeScript bot and its worker. Agents must not run it.
 - `npm start` — run the compiled bot and its worker. Agents must not run it.
@@ -42,8 +47,8 @@ Commands are defined in `package.json`:
 
 - Never read, print, expose, commit, or replace secrets from `.env`.
 - Use `.env.example` for documented configuration and test fixtures.
-- Never run tests, start the Telegram bot, inference worker, Ollama, or any other
-  service, and never make real Telegram or Ollama requests.
+- Never run tests or evaluation, start the Telegram bot, inference worker,
+  Ollama, or any other service, and never make real Telegram or Ollama requests.
 - Give the user the exact validation or run commands to execute. Diagnose only
   command output the user supplies, then make the smallest necessary correction.
 - Do not commit, push, or modify Git history unless the user explicitly requests
