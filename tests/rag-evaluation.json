@@ -1,0 +1,17 @@
+{
+  "documents": [
+    { "userId": "alice", "filename": "leave-policy.pdf", "fileType": "pdf", "pageNumber": 4, "text": "Employees receive 24 days of annual leave and must request it in the HR portal.", "topic": "leave" },
+    { "userId": "alice", "filename": "security.md", "fileType": "md", "text": "Report suspected phishing to security@example.test within one hour.", "topic": "security" },
+    { "userId": "alice", "filename": "benefits.docx", "fileType": "docx", "text": "The employer retirement contribution is five percent after probation.", "topic": "benefits" },
+    { "userId": "alice", "filename": "office.txt", "fileType": "txt", "text": "The Berlin office opens at 08:30 on weekdays.", "topic": "office" },
+    { "userId": "bob", "filename": "private.txt", "fileType": "txt", "text": "Project Cobalt launches on 17 November.", "topic": "cobalt" }
+  ],
+  "cases": [
+    { "name": "pdf page source", "userId": "alice", "question": "How many annual leave days are there?", "topic": "leave", "expectedSource": "leave-policy.pdf", "identifyingText": "24 days" },
+    { "name": "markdown source", "userId": "alice", "question": "Where should phishing be reported?", "topic": "security", "expectedSource": "security.md", "identifyingText": "security@example.test" },
+    { "name": "docx source", "userId": "alice", "question": "What is the retirement contribution?", "topic": "benefits", "expectedSource": "benefits.docx", "identifyingText": "five percent" },
+    { "name": "txt among multiple documents", "userId": "alice", "question": "When does the Berlin office open?", "topic": "office", "expectedSource": "office.txt", "identifyingText": "08:30" },
+    { "name": "no answer", "userId": "alice", "question": "What is the cafeteria menu?", "topic": "missing", "expectedSource": null, "identifyingText": null },
+    { "name": "user isolation", "userId": "alice", "question": "When does Project Cobalt launch?", "topic": "cobalt", "expectedSource": null, "identifyingText": null }
+  ]
+}

@@ -1,0 +1,9 @@
+import { describe, expect, it, vi } from "vitest";
+import { OllamaEmbeddingClient } from "../src/rag/ollama-embeddings.js";
+
+describe("Ollama embeddings", () => {
+  it("posts a batch and validates exact dimensions", async () => { const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ embeddings: [[1, 0, 0], [0, 1, 0]] }), { status: 200 })); const client = new OllamaEmbeddingClient({ baseUrl: "http://localhost", model: "embed", dimension: 3, timeoutMs: 1_000, fetch: fetchMock }); await expect(client.embed(["one", "two"])).resolves.toHaveLength(2); expect(fetchMock).toHaveBeenCalledWith("http://localhost/api/embed", expect.objectContaining({ body: JSON.stringify({ model: "embed", input: ["one", "two"] }) })); });
+  it.each([{ embeddings: [[1, 2]] }, { embeddings: [[1, Number.NaN, 3]] }, { embeddings: [] }])("rejects malformed vectors", async (body) => { const client = new OllamaEmbeddingClient({ baseUrl: "http://localhost", model: "embed", dimension: 3, timeoutMs: 1_000, fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })) }); await expect(client.embed(["one"])).rejects.toThrow(); });
+  it("reports transport failure without response content", async () => { const client = new OllamaEmbeddingClient({ baseUrl: "http://localhost", model: "embed", dimension: 3, timeoutMs: 1, fetch: vi.fn<typeof fetch>().mockRejectedValue(new Error("secret body")) }); await expect(client.embed(["one"])).rejects.toThrow("Could not connect"); });
+  it("aborts a timed-out embedding request", async () => { const hanging = vi.fn<typeof fetch>((_input, init) => new Promise((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true }))); const client = new OllamaEmbeddingClient({ baseUrl: "http://localhost", model: "embed", dimension: 3, timeoutMs: 1, fetch: hanging }); await expect(client.embed(["one"])).rejects.toThrow("timed out"); });
+});

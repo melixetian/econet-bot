@@ -90,3 +90,23 @@ Implement both required Skills from the specification: weather via `wttr.in` and
 Implement the full specification, update existing tests, and keep `README.md`, `.env.example`, `.gitignore`, `AGENTS.md`, and `package.json` consistent with the result. Preserve working parts of the current bot and keep the solution minimal.
 
 Do not read or expose the real `.env` or secrets. Do not run tests and do not start the bot, worker, Ollama, or any other service. Do not make real Telegram, Ollama, weather, or exchange-rate requests. When finished, summarize the changes and provide the exact validation and run commands for me to execute.
+
+
+## RAG implementation prompt
+
+Implement the next iteration from `Spec.md`: document RAG for the existing Telegram AI agent.
+
+Before editing, read `AGENTS.md`, `Spec.md`, `README.md`, `package.json`, and relevant source/tests. Treat `Spec.md` as authoritative where earlier code or docs conflict. Extend the current design and preserve working Telegram, JSONL worker, Ollama chat, history, Skills, `exec`, access control, limits, and errors.
+
+Implement the complete required scope: document upload/parsing, deterministic chunking, Ollama embeddings, SQLite + sqlite-vec storage, user-filtered retrieval, native `search_documents`, `/documents`, `/delete`, source-grounded/no-answer behavior, errors, automated tests, evaluation dataset/command, and documentation. Do not add bonus features or speculative abstractions.
+
+Security is strict: derive ownership from the validated Telegram sender; never accept `userId` in model tool arguments; filter it inside the vector query; validate temporary paths; never inspect or expose secrets or real user data.
+
+You may install dependencies and run static checks such as type-checking. Write/update tests, but do not run tests or evaluation, start the bot/worker/Ollama, or make real network requests. Do not read or modify the real `.env`; I will validate locally.
+
+Work autonomously unless genuinely blocked. At the end report only:
+
+1. changed files and implemented behavior;
+2. key decisions or justified deviations from `Spec.md`;
+3. remaining risks or limitations;
+4. exact commands for type-checking, tests, evaluation, and manual startup.

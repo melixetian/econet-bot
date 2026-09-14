@@ -21,8 +21,9 @@ async function main(): Promise<void> {
   const inference = new InferenceWorkerClient(
     createNodeWorkerFactory(workerPath, workerRunnerArguments),
     config.agentTimeoutMs,
+    config.documentTimeoutMs,
   );
-  const bot = createBot(config.telegramBotToken, config.allowedTelegramUserIds, inference);
+  const bot = createBot(config.telegramBotToken, config.allowedTelegramUserIds, inference, { documentTempDir: config.documentTempDir, maxDocumentBytes: config.maxDocumentBytes, documentTimeoutMs: config.documentTimeoutMs });
   let stopping = false;
 
   const shutdown = async (): Promise<void> => {

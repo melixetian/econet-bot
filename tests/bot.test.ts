@@ -1,8 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import {
   getInferencePrompt,
+  isAuthorizedSender,
+  processDocumentUpload,
   splitTelegramMessage,
   TELEGRAM_MESSAGE_LIMIT,
+  validateUpload,
+  type InferenceClient,
 } from "../src/bot.js";
 
 describe("getInferencePrompt", () => {
@@ -24,6 +31,18 @@ describe("getInferencePrompt", () => {
   ])("ignores %s", (_description, message) => {
     expect(getInferencePrompt(message)).toBeNull();
   });
+});
+
+describe("document upload validation", () => {
+  it("requires an allowlisted sender before any operation", () => { const allowed = new Set(["7"]); expect(isAuthorizedSender(undefined, allowed)).toBe(false); expect(isAuthorizedSender(8, allowed)).toBe(false); expect(isAuthorizedSender(7, allowed)).toBe(true); });
+  it("accepts supported safe names and normalizes the extension", () => expect(validateUpload("Policy.PDF", 100, 1_000)).toEqual({ filename: "Policy.PDF", fileType: "pdf" }));
+  it.each(["", "../policy.pdf", "folder/policy.pdf", "folder\\policy.pdf", "bad\0.pdf"])("rejects unsafe filename %j", (filename) => expect(() => validateUpload(filename, 1, 100)).toThrow());
+  it("rejects unsupported and oversized files before download", () => { expect(() => validateUpload("a.csv", 1, 100)).toThrow("Unsupported"); expect(() => validateUpload("a.txt", 101, 100)).toThrow("too large"); });
+});
+
+describe("document upload lifecycle", () => {
+  it("downloads, indexes with trusted ownership, replies, and cleans up", async () => { const root = mkdtempSync(join(tmpdir(), "bot-upload-")); const replies: string[] = []; let indexedPath = ""; const inference = { indexDocument: vi.fn(async (userId: string, filename: string, fileType: string, path: string) => { expect([userId, filename, fileType]).toEqual(["trusted", "notes.txt", "txt"]); expect(existsSync(path)).toBe(true); indexedPath = path; return { filename, chunkCount: 1 }; }) } as unknown as InferenceClient; try { await processDocumentUpload({ token: "token", userId: "trusted", fileId: "file", filename: "notes.txt", knownSize: 4, inference, options: { documentTempDir: root, maxDocumentBytes: 10, documentTimeoutMs: 1_000, fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response("text")), createId: () => "unique" }, getRemotePath: async () => "remote", reply: async (text) => { replies.push(text); } }); expect(replies).toEqual(["📄 Document received.\n\nProcessing...", "✅ Document is ready.\n\nYou can now ask questions about it."]); expect(existsSync(indexedPath)).toBe(false); } finally { rmSync(root, { recursive: true, force: true }); } });
+  it("uses a safe reply and cleans partial files after download errors", async () => { const root = mkdtempSync(join(tmpdir(), "bot-upload-")); const replies: string[] = []; try { await processDocumentUpload({ token: "token", userId: "trusted", fileId: "file", filename: "notes.txt", knownSize: 4, inference: { indexDocument: vi.fn() } as unknown as InferenceClient, options: { documentTempDir: root, maxDocumentBytes: 3, documentTimeoutMs: 1_000, fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response("oversized")), createId: () => "unique" }, getRemotePath: async () => "remote", reply: async (text) => { replies.push(text); } }); expect(replies.at(-1)).toBe("Document is too large."); expect(existsSync(join(root, "unique.upload"))).toBe(false); } finally { rmSync(root, { recursive: true, force: true }); } });
 });
 
 describe("splitTelegramMessage", () => {

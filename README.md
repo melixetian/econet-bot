@@ -1,70 +1,104 @@
 # Econet Bot
 
-A minimal TypeScript Telegram AI agent backed by a local Ollama model. It keeps a separate conversation per Telegram chat, can start over with `/new`, and can use one `exec` shell tool for fresh data or explicitly authorized actions.
+A minimal TypeScript Telegram AI agent backed by local Ollama. It remembers each Telegram chat, retains user-owned documents for retrieval-augmented answers, and can use its existing Skills and `exec` shell tool.
 
-## Prerequisites and setup
+## Setup
 
-- Node.js 20+ and npm
-- [Ollama](https://ollama.com/) with a model that supports native tool calling (the default is `qwen3:1.7b`)
-- A Telegram bot token from BotFather
-- Your Telegram numeric user ID. Send a message to a bot such as `@userinfobot`, or inspect an update through Telegram's Bot API; do not use a username.
+Requirements are Node.js 20+, npm, Ollama, a Telegram bot token, and the decimal Telegram user IDs allowed to use the bot. `better-sqlite3` and `sqlite-vec` are native dependencies; use a supported Node/platform combination with a working native package install toolchain if a prebuilt binary is unavailable.
 
 ```sh
 npm install
 cp .env.example .env
 ollama pull qwen3:1.7b
+ollama pull embeddinggemma
 ```
 
-Set `TELEGRAM_BOT_TOKEN` and a comma-separated `ALLOWED_TELEGRAM_USER_IDS` list in `.env`. The allowlist is mandatory and is checked against message sender IDs, not chat IDs.
+Set `TELEGRAM_BOT_TOKEN` and the mandatory comma-separated `ALLOWED_TELEGRAM_USER_IDS` in `.env`. Never commit or share `.env`. Sender IDs—not usernames or chat IDs—control access and document ownership.
+
+## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | none | Required Telegram token |
-| `ALLOWED_TELEGRAM_USER_IDS` | none | Required authorized sender IDs |
-| `INFERENCE_PROVIDER` | `ollama` | Worker-side provider |
-| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama service URL |
-| `OLLAMA_MODEL` | `qwen3:1.7b` | Tool-capable local model |
-| `LLM_TIMEOUT_MS` | `60000` | Per Ollama call timeout |
-| `AGENT_TIMEOUT_MS` | `300000` | Whole agent-run timeout |
-| `AGENT_MAX_STEPS` | `5` | Model calls per run (1–10) |
-| `EXEC_TIMEOUT_MS` | `30000` | Per-command timeout |
-| `CHAT_HISTORY_MESSAGES` | `20` | Persisted messages supplied as context |
-| `CHAT_DB_PATH` | `./data/chat-history.sqlite` | SQLite conversation store |
-| `SKILLS_DIR` | `./skills` | Directory containing `*/SKILL.md` files |
-| `AGENT_WORKSPACE_DIR` | `./agent-workspace` | Initial shell working directory |
+| `ALLOWED_TELEGRAM_USER_IDS` | none | Required authorized decimal sender IDs |
+| `INFERENCE_PROVIDER` | `ollama` | Worker-side chat provider |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama URL |
+| `OLLAMA_MODEL` | `qwen3:1.7b` | Tool-capable chat model |
+| `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Embedding model |
+| `RAG_EMBEDDING_DIMENSION` | `768` | Exact embedding/vector dimension |
+| `LLM_TIMEOUT_MS` | `60000` | One chat-model call |
+| `EMBEDDING_TIMEOUT_MS` | `60000` | One embedding call |
+| `AGENT_TIMEOUT_MS` | `300000` | Whole chat request |
+| `DOCUMENT_TIMEOUT_MS` | `300000` | Index/list/delete operation |
+| `AGENT_MAX_STEPS` | `5` | Model calls per run, from 1 to 10 |
+| `EXEC_TIMEOUT_MS` | `30000` | Shell command timeout |
+| `CHAT_HISTORY_MESSAGES` | `20` | Recent stored messages in context |
+| `CHAT_DB_PATH` | `./data/chat-history.sqlite` | Conversation database |
+| `RAG_DB_PATH` | `./data/rag.sqlite` | Document/chunk/vector database |
+| `DOCUMENT_TEMP_DIR` | `./data/tmp-documents` | Ephemeral download directory |
+| `MAX_DOCUMENT_BYTES` | `10485760` | Uploaded-byte limit (10 MiB) |
+| `MAX_EXTRACTED_TEXT_CHARS` | `1000000` | Extracted-text limit |
+| `RAG_CHUNK_SIZE_CHARS` | `1600` | Target characters per chunk |
+| `RAG_CHUNK_OVERLAP_CHARS` | `300` | Characters overlapped between chunks |
+| `EMBEDDING_BATCH_SIZE` | `16` | Index inputs per `/api/embed` call |
+| `RAG_TOP_K` | `5` | Nearest chunks requested |
+| `RAG_MAX_DISTANCE` | `1.0` | Maximum accepted L2 distance |
+| `RAG_MAX_CONTEXT_CHARS` | `8000` | Maximum retrieved chunk text returned to the model |
+| `SKILLS_DIR` | `./skills` | Local `*/SKILL.md` directory |
+| `AGENT_WORKSPACE_DIR` | `./agent-workspace` | Initial `exec` directory |
 
-`.env` must never be committed.
+Changing the embedding model or dimension makes an existing index incompatible. Stop the app, remove or move `RAG_DB_PATH`, and re-upload documents; automatic re-embedding is intentionally not implemented.
 
-## Run and validate
+## Behavior and architecture
 
-Start Ollama if your platform does not run it in the background, then use either:
+The Telegram and inference worker are separate long-lived processes connected by strictly validated JSONL over stdin/stdout. Telegram performs the sender allowlist check before commands, downloads, or worker calls. It derives `conversationId` from the chat and trusted document `userId` from the validated sender. The sequential worker owns conversation history, extraction, deterministic chunking, Ollama embeddings, SQLite/sqlite-vec, Skills, and the bounded model/tool loop.
+
+Upload one `.txt`, `.md`, `.docx`, or text-based `.pdf` document per update. The bot validates the safe basename and known size, downloads to a unique temporary path, indexes it, and always removes the temporary bytes. Original files are never retained. Filenames are case-sensitive and unique per user.
+
+- `/start` or `/help` describes available behavior without model use.
+- `/new` clears only the current chat history; it does not delete documents.
+- `/documents` lists only the sender's documents in creation order.
+- `/delete <filename>` deletes one exact owned filename, its chunks, and its vectors.
+
+TXT and Markdown use UTF-8; DOCX uses Mammoth; PDF.js extracts text page by page with one-based page metadata. OCR and image-only/scanned PDFs are unsupported. Text is normalized and split deterministically around 1,600 characters with 300-character overlap, preferring paragraph, line, sentence, and whitespace boundaries. Smaller chunks can improve precision but lose context; larger chunks retain context but dilute similarity and consume more context. More overlap helps boundary-spanning facts at the cost of storage and embedding work.
+
+The RAG database has `documents`, ordered `chunks`, and a sqlite-vec `vec0` table whose row IDs equal chunk IDs. Foreign keys connect chunks to documents; vector rows carry `user_id` as a partition key and `document_id` metadata. Index inserts and deletions are transactions, with vector rows explicitly deleted. The `search_documents` model tool accepts only a standalone `query`; trusted ownership is injected by the runtime. Its KNN query contains exact `user_id = ?` filtering, then joins and defensively rechecks ownership, so global results are never post-filtered.
+
+Indexing and queries use the same 768-dimensional `embeddinggemma` vectors. Retrieval uses normalized-vector L2 distance, asks for Top 5, rejects distances above 1.0, preserves nearest-first order, and returns only complete chunks within 8,000 text characters. For unit vectors, L2 `1.0` corresponds to cosine similarity `0.5`. The earlier `0.8` default rejected a manually verified relevant result at `0.9717`; the revised threshold admits that result while retaining a relevance cutoff. Tune it further only with evaluation evidence.
+
+Document-derived answers must use retrieved text, cite the exact filename and PDF page (or zero-based chunk number when no page exists), and say the information was not found in uploaded documents when retrieval does not support an answer. Retrieved text is treated as untrusted data. Corrupt, protected, empty, image-only, oversized, duplicate, unavailable, timeout, embedding, database, and model failures receive concise messages without paths, SQL, contents, vectors, or secrets.
+
+## Run, validate, and evaluate
+
+```sh
+npm run typecheck
+npm test
+npm run evaluate
+```
+
+`npm run evaluate` uses deterministic fake topic vectors and a temporary sqlite-vec database. Its six cases cover TXT, Markdown, DOCX, PDF source/page metadata, multiple documents, no-answer behavior, and cross-user isolation; it does not call Telegram, Ollama, or an LLM.
+
+Start in development:
 
 ```sh
 npm run dev
 ```
+
+Or compile and start:
 
 ```sh
 npm run build
 npm start
 ```
 
-Validate the repository with:
+Manual demonstration: upload a text PDF and ask a question whose answer appears on a known page; verify the answer includes `Source: filename.pdf, page N`. Ask for absent information and verify a not-found answer. Upload additional formats, use `/documents`, then delete one exact name and confirm it no longer retrieves. With two allowlisted senders in a group, upload different documents and verify each sender can search/list/delete only their own. Finally run the test and evaluation commands above.
 
-```sh
-npm run typecheck
-npm test
-```
+Runtime databases and WAL/SHM files, temporary documents, build output, coverage, dependencies, `.env`, and the agent workspace are ignored by Git. Logs contain only safe categories and metadata, never prompts, document contents, tool arguments/results, vectors, responses, or secrets.
 
-## Behavior and manual checks
+Runtime progress is written to stderr (the terminal running `npm run dev` or `npm start`). Structured `event=...` records cover Telegram receipt/reply, document download, extraction, chunking, embedding, storage, retrieval, each model/tool step, completion, durations, counts, and safe failures. For a document question, the normal path is `model_call_completed ... tool_calls=1`, `tool_started ... tool="search_documents"`, `document_search_completed`, and then another model call. If the model instead asks the user to wait or claims that uploaded documents lack the information without searching, the agent rejects that unverified response and logs `document_search_fallback_started`; it searches with the current prompt through the same trusted-user retrieval path and gives the result back to the model. Ordinary direct answers do not trigger this narrow fallback. Prompt and response text, document content, tool arguments/results, vectors, paths, tokens, and secrets are never logged.
 
-`/start` and `/help` describe the bot without model usage. `/new` removes stored history only for the current Telegram chat. Other commands are ignored. Normal non-empty text messages are processed sequentially, preserving each chat's recent user and final assistant messages in SQLite.
-
-The worker starts with two local Skills: weather via `wttr.in`, and fiat exchange rates via Frankfurter. For a direct answer, send “Explain photosynthesis briefly.” For a tool call, send “What is the weather in Amsterdam?” or “Convert 10 EUR to USD.” Then send a contextual follow-up such as “What about tomorrow?” Finally send `/new` and verify that the prior context is no longer used.
-
-The Telegram process handles access, commands, replies, chunking, and worker lifecycle. The worker process owns JSONL requests, SQLite history, Skills, the bounded model → tool → model loop, and command execution. Ollama remains an HTTP-only provider; it receives chat messages and the one `exec` tool definition.
-
-`CHAT_DB_PATH` and `AGENT_WORKSPACE_DIR` are runtime locations and are ignored by Git, together with SQLite WAL/SHM files.
+`document_search_candidates` reports only the number of user-filtered KNN candidates, nearest L2 distance, and configured maximum distance. A positive candidate count followed by `no_match` means the distance threshold rejected every candidate; zero candidates indicates an indexing/vector-visibility problem instead.
 
 ## Security warning
 
-**`exec` runs commands through the host shell. `AGENT_WORKSPACE_DIR` is only an initial directory, not a security sandbox.** The mandatory Telegram allowlist limits who may reach the agent, but it is not a complete safety boundary. Run the bot under a low-privilege account or in a container, and authorize destructive, irreversible, or privileged actions only with care. Commands receive a minimal environment without the bot token or application configuration, but shell access still has the operating-system permissions of the bot process.
+**`exec` runs commands through the host shell. `AGENT_WORKSPACE_DIR` is only an initial directory, not a security sandbox.** The allowlist limits who can reach the agent but is not a complete isolation boundary. Run it as a low-privilege account or in a container, and authorize destructive, irreversible, or privileged actions carefully. Commands receive a minimal environment without the bot token or application configuration, but retain the operating-system permissions of the bot process.
