@@ -11,15 +11,24 @@ import { SqliteRag } from "../rag/sqlite-rag.js";
 import { parseInferenceRequest, type InferenceRequest, type InferenceResponse } from "./protocol.js";
 import { createInferenceProvider } from "./providers/factory.js";
 import { logEvent } from "../logging.js";
+import { SqliteAudit } from "../audit/sqlite-audit.js";
+import { FailOpenAudit } from "../audit/fail-open.js";
+import type { AuditSink } from "../audit/types.js";
 
 function writeResponse(response: InferenceResponse): void { process.stdout.write(`${JSON.stringify(response)}\n`); }
 function failure(request: InferenceRequest, error: unknown): InferenceResponse { if (error instanceof DocumentError) return { id: request.id, ok: false, error: error.message, code: error.code }; return { id: request.id, ok: false, error: request.type === "chat" ? "Inference request failed." : "Document operation failed.", code: request.type === "chat" ? "inference_failed" : "document_operation_failed" }; }
 
 try {
   const config = loadWorkerConfig();
+  let auditStorage: AuditSink | null = null;
+  if (config.tokenAuditEnabled) {
+    try { auditStorage = new SqliteAudit(config.tokenAuditDbPath, config.tokenAuditAgentId); }
+    catch { logEvent("worker", "audit_error", { category: "storage_unavailable" }); }
+  }
+  const audit = new FailOpenAudit(auditStorage);
   const history = new SqliteHistory(config.chatDbPath);
   const rag = new RagService(new SqliteRag(config.ragDbPath, config.ollamaEmbeddingModel, config.ragEmbeddingDimension), new OllamaEmbeddingClient({ baseUrl: config.ollamaBaseUrl, model: config.ollamaEmbeddingModel, dimension: config.ragEmbeddingDimension, timeoutMs: config.embeddingTimeoutMs }), config);
-  const agent = new Agent(createInferenceProvider(config), history, loadSkills(config.skillsDir), config, rag);
+  const agent = new Agent(createInferenceProvider(config), history, loadSkills(config.skillsDir), config, rag, audit);
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
   let queue = Promise.resolve();
   input.on("line", (line) => {
@@ -30,7 +39,7 @@ try {
       logEvent("worker", "request_started", { request_id: request.id, request_type: request.type });
       const controller = new AbortController(); const timeoutMs = request.type === "chat" || request.type === "reset" ? config.agentTimeoutMs : config.documentTimeoutMs; const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        if (request.type === "chat") writeResponse({ id: request.id, ok: true, type: "chat", text: await agent.chat(request.conversationId, request.userId, request.prompt, controller.signal) });
+        if (request.type === "chat") writeResponse({ id: request.id, ok: true, type: "chat", text: await agent.chat(request.conversationId, request.userId, request.prompt, controller.signal, request.id) });
         else if (request.type === "reset") { agent.reset(request.conversationId); writeResponse({ id: request.id, ok: true, type: "reset" }); }
         else if (request.type === "index_document") writeResponse({ id: request.id, ok: true, type: "index_document", document: await rag.indexDocument(request.userId, request.filename, request.fileType, request.tempPath, controller.signal) });
         else if (request.type === "list_documents") writeResponse({ id: request.id, ok: true, type: "list_documents", documents: rag.listDocuments(request.userId) });
@@ -40,5 +49,5 @@ try {
       finally { clearTimeout(timer); }
     });
   });
-  process.once("exit", () => { history.close(); rag.close(); });
+  process.once("exit", () => { history.close(); rag.close(); audit.close(); });
 } catch { console.error("Inference worker configuration error"); process.exitCode = 1; }

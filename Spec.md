@@ -98,7 +98,7 @@ The worker processes requests sequentially to prevent concurrent history and doc
 - Chat requests therefore contain trusted `conversationId` and `userId`.
 - In a group, allowed senders share chat history but search only their own documents.
 
-Never log tokens, user messages, document text, model responses, tool arguments/output, file contents, or secrets. Opaque IDs, filenames, sizes, durations, counts, and safe error categories are acceptable.
+Never log tokens, user/chat IDs, source filenames, user messages, document text, model responses, tool arguments/output, file contents, or secrets. Opaque worker request IDs, sizes, durations, counts, and safe error categories are acceptable.
 
 Operational diagnostics on stderr report document download, validation, extraction, chunking, embedding, storage, retrieval, model/tool steps, completion, duration, and safe failure categories. They contain lengths and counts where useful, but never the protected contents listed above. A model must not emit a provisional "please wait" response or claim that uploaded documents lack information without searching. If it does, the bounded agent loop rejects that unverified final response, searches with the current user prompt through the same trusted-user RAG path, and gives the result back to the model. This narrow fallback does not search for ordinary direct answers.
 
@@ -333,6 +333,7 @@ Preserve existing rules and add:
 - Cite every used exact filename and page when available, otherwise chunk number.
 - If retrieval returns `no_match` or lacks support, say the information was not found in uploaded documents.
 - Never present general knowledge as document-derived.
+- After a successful tool result, use that result and do not repeat the same call. Retry a failed tool only with corrected arguments.
 
 Source format:
 
@@ -371,7 +372,7 @@ For chat:
 5. otherwise execute calls sequentially with structured tool messages;
 6. repeat within `AGENT_MAX_STEPS`.
 
-One step is one model call. Do not execute tool calls requested on the last allowed call; return and persist `I couldn't complete the request within the agent step limit.` Intermediate content accompanying tool calls is not sent to Telegram. Tool failures go to the model; provider/history/RAG/overall failures use the safe path.
+One step is one model call. Do not execute tool calls requested on the last allowed call; return and persist `I couldn't complete the request within the agent step limit.` An exact tool call repeated after the model has already received its successful result is not executed again; return a small structured failure directing the model to the earlier result. Corrected retries, failed-call retries, and multiple calls within the same model-requested round retain normal execution. The duplicate signature exists only in run memory and is never audited or logged. Intermediate content accompanying tool calls is not sent to Telegram. Tool failures go to the model; provider/history/RAG/overall failures use the safe path.
 
 ## 16. Errors
 
@@ -525,3 +526,19 @@ Include a short manual demonstration: upload, grounded answer, source, missing a
 - Never read, print, modify, or commit real `.env`, credentials, runtime databases, uploads, or user documents.
 - Do not broaden scope or weaken access control, ownership filtering, validation, timeouts, transactionality, or bounds.
 - If a dependency/API differs, verify official documentation, make the smallest compatible adjustment, and report it.
+
+## 23. Token audit and optimized context profile
+
+`TokenAuditSpec.md` is the authoritative supplement for chat-loop observability, the local terminal dashboard, benchmark/comparison/report tooling, and bounded context optimizations. These additions remain worker-side and do not alter the JSONL protocol or Telegram behavior.
+
+Every chat request creates an opaque audit run when enabled. Every attempted LLM call and executed model tool call is recorded exactly once in a separate fail-open SQLite database. Ollama's validated `prompt_eval_count`, `eval_count`, optional `prompt_eval_cached_count`, and provider duration are exact; missing or invalid exact usage remains unavailable. Context categories, repeated/new context, and tool payload tokens use the labelled deterministic estimate `ceil(UTF-8 bytes / 4)`. Run-scoped salted hashes exist only in memory and only aggregate repetition counts are stored.
+
+The default `optimized` profile budgets stored history at 1,600 estimated tokens by newest complete exchanges, skipping any oversized exchange without an exception. Current input and persisted history are unchanged. Model-visible `exec` is capped at 3,000 JSON characters while preserving executor status, prefix/suffix, original sizes and marker. Older transient tool results become shorter receipts only after initial full delivery and when their text evidence remains verbatim in newer results (or no text evidence exists). Unique older evidence and the newest round remain full.
+
+RAG removes only exact overlapping suffix/prefix text between consecutive chunk indices with identical document/page metadata, and only if the marker is shorter than the removed text. An optimized 4,500-character text budget retains a complete highest-ranked result prefix, preserving source metadata and order. An oversized top result stays complete under the existing retrieval hard bound; the v2 benchmark does not use this exception. Retrieval ownership, ranking, threshold and original Top-K/context limits remain unchanged. `RAG_MODEL_CONTEXT_MAX_CHARS` configures this secondary budget.
+
+The `baseline` profile preserves pre-optimization context selection and tool bodies. Both profiles share instrumentation and correctness fixes: explicitly uploaded-document questions must call `search_documents`, including expected no-match; elliptical follow-ups form a standalone query from recent history; a successful tool call is not repeated; and provider-neutral tool history is translated to Ollama-native `tool_calls` and `tool_name` fields. The common system instructions are compact, structured rules suitable for the configured small model. Bundled Skills remain unchanged and fully available, with no dynamic Skill selection. Normal runtime model, tool availability, timeouts, JSONL protocol and Telegram behavior are unchanged.
+
+The corrected benchmark uses one paired invocation with an opaque cohort, shared code/dataset/bundled-Skills snapshot, deterministic options, safe context preflight, sufficient benchmark-only timeouts and isolated in-memory history/RAG/exec fixtures. Preflight reserves every permitted tool round, including one full expected fixture result and bounded duplicate/unexpected-call feedback, plus every model output reserve. The shared agent suppresses an exact successful call only after its result was delivered; benchmark fixtures also deliver a full result only once for the case's exact expected call as a fail-safe. Retries remain recorded and fail exact tool-count scoring instead of expanding context until timeout. It never modifies real history or document stores. Versioned audit metadata and delivery events contain only counts, statuses, booleans and safe identifiers. Additive migrations preserve prior audit records; legacy labels are invalid evidence. Duplicate labels require explicit overwrite, which archives prior records. Timestamped outputs never silently overwrite earlier evidence. Invalid/incomplete or incompatible comparisons show N/A rather than partial exact totals and exit non-zero. See `TokenAuditSpec.md` section 11.4 for exact limits, validation, privacy-safe diagnostic codes and acceptance rules.
+
+Audit storage never contains prompts, completions, commands, queries, document text, tool output, source filenames, user/chat IDs, secrets, vectors, or reusable content hashes. It contains opaque run/task identifiers, the stable configured agent label, profile/model names, timestamps, normalized statuses/tool names, counts, bytes, token metrics/estimates, durations, costs, and synthetic benchmark case metadata. The dashboard and report read only audit data. Local Ollama rates default to zero; non-zero configured values are explicitly notional.

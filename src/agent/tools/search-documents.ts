@@ -10,7 +10,7 @@ export const SEARCH_DOCUMENTS_TOOL: ToolDefinition = {
       type: "object",
       additionalProperties: false,
       required: ["query"],
-      properties: { query: { type: "string", description: "A concise standalone semantic search query." } },
+      properties: { query: { type: "string", description: "A concise standalone semantic query. Include relevant conversation context; do not send a pronoun-only follow-up." } },
     },
   },
 };

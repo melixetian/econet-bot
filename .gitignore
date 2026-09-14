@@ -7,6 +7,7 @@ coverage/
 *.sqlite-shm
 agent-workspace/
 data/tmp-documents/
+*.sqlite.benchmark.lock
 
 # Local AI-agent logs and temporary state
 .codex/logs/

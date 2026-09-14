@@ -1,0 +1,278 @@
+{
+  "version": 2,
+  "cases": [
+    {
+      "id": "direct-arithmetic",
+      "prompts": [
+        "Answer directly without tools: what is 17 plus 25?"
+      ],
+      "values": [
+        [
+          "42",
+          "forty two"
+        ]
+      ],
+      "tools": []
+    },
+    {
+      "id": "direct-concept",
+      "prompts": [
+        "Answer directly without tools: what does HTTP stand for?"
+      ],
+      "values": [
+        [
+          "hypertext transfer protocol"
+        ]
+      ],
+      "tools": []
+    },
+    {
+      "id": "history-growth",
+      "history": true,
+      "prompts": [
+        "What was the recent synthetic reservation code? Answer directly from our conversation without tools."
+      ],
+      "values": [
+        [
+          "ORBIT-731"
+        ]
+      ],
+      "tools": []
+    },
+    {
+      "id": "rag-txt",
+      "prompts": [
+        "Search my uploaded documents with search_documents. What is the Project Cobalt launch date? Cite the source."
+      ],
+      "values": [
+        [
+          "17 November",
+          "November 17",
+          "seventeenth November",
+          "November seventeenth"
+        ]
+      ],
+      "tools": [
+        "search_documents"
+      ],
+      "source": {
+        "filename": "launch.txt",
+        "chunkIndex": 0
+      },
+      "fact": "Project Cobalt launches on 17 November."
+    },
+    {
+      "id": "rag-markdown",
+      "prompts": [
+        "Use search_documents to search my uploaded documents for the synthetic emergency color. Cite the source."
+      ],
+      "values": [
+        [
+          "amber"
+        ]
+      ],
+      "tools": [
+        "search_documents"
+      ],
+      "source": {
+        "filename": "safety.md",
+        "chunkIndex": 2
+      },
+      "fact": "The synthetic emergency color is amber."
+    },
+    {
+      "id": "rag-pdf-page",
+      "prompts": [
+        "Use search_documents to search my uploaded documents for the annual leave allowance. Cite the source and page."
+      ],
+      "values": [
+        [
+          "24 days",
+          "twenty four days"
+        ]
+      ],
+      "tools": [
+        "search_documents"
+      ],
+      "source": {
+        "filename": "handbook.pdf",
+        "pageNumber": 7,
+        "chunkIndex": 12
+      },
+      "fact": "The annual leave allowance is 24 days."
+    },
+    {
+      "id": "rag-docx",
+      "prompts": [
+        "Use search_documents to search my uploaded documents. Which floor is the research lab on? Cite the source."
+      ],
+      "values": [
+        [
+          "floor 6",
+          "floor six",
+          "sixth floor",
+          "6th floor"
+        ]
+      ],
+      "tools": [
+        "search_documents"
+      ],
+      "source": {
+        "filename": "office.docx",
+        "chunkIndex": 4
+      },
+      "fact": "The research lab is on floor 6."
+    },
+    {
+      "id": "rag-follow-up",
+      "prompts": [
+        "The document topic for my next question is the synthetic travel policy. Acknowledge only.",
+        "For the policy topic I named in my previous message, use search_documents to find its meal limit. Cite the source."
+      ],
+      "values": [
+        [
+          "38 dollars",
+          "thirty eight dollars",
+          "$38"
+        ]
+      ],
+      "tools": [
+        "search_documents"
+      ],
+      "queryTerms": [
+        "travel"
+      ],
+      "source": {
+        "filename": "travel.md",
+        "chunkIndex": 1
+      },
+      "fact": "The synthetic travel policy meal limit is 38 dollars."
+    },
+    {
+      "id": "rag-no-match",
+      "prompts": [
+        "Use search_documents to search my uploaded documents for the submarine parking rule. If no evidence is returned, say the information was not found in uploaded documents."
+      ],
+      "values": [
+        [
+          "not found",
+          "could not find",
+          "no matching information",
+          "no information found"
+        ]
+      ],
+      "tools": [
+        "search_documents"
+      ],
+      "noMatch": true,
+      "forbidden": [
+        "parking is allowed",
+        "parking allowed",
+        "parking is prohibited",
+        "parking prohibited",
+        "parking costs",
+        "can park",
+        "allowed to park",
+        "must park"
+      ]
+    },
+    {
+      "id": "exec-large",
+      "prompts": [
+        "Use exec once with command audit-large (a harmless local benchmark fixture). Report its identifying result and whether it succeeded. Do not repeat the routine log."
+      ],
+      "values": [
+        [
+          "BATCH-731"
+        ],
+        [
+          "success",
+          "succeeded",
+          "successful",
+          "successfully"
+        ]
+      ],
+      "tools": [
+        "exec"
+      ],
+      "exec": "large"
+    },
+    {
+      "id": "exec-failure",
+      "prompts": [
+        "Use exec once with command audit-failure (a harmless local benchmark fixture). Report that it failed; do not claim success."
+      ],
+      "values": [
+        [
+          "failed",
+          "failure",
+          "unsuccessful"
+        ]
+      ],
+      "forbidden": [
+        "completed successfully",
+        "command succeeded"
+      ],
+      "tools": [
+        "exec"
+      ],
+      "exec": "failure"
+    },
+    {
+      "id": "sequential-tools",
+      "prompts": [
+        "First use exec with command audit-ticket (a harmless local benchmark fixture). After receiving the ticket, in a later tool round use search_documents to look up that ticket in my uploaded documents. Report the ticket and its desk number with a source."
+      ],
+      "values": [
+        [
+          "TICKET-731"
+        ],
+        [
+          "desk 6",
+          "desk six"
+        ]
+      ],
+      "tools": [
+        "exec",
+        "search_documents"
+      ],
+      "sequential": true,
+      "queryTerms": ["TICKET-731"],
+      "source": {
+        "filename": "tickets.md",
+        "chunkIndex": 0
+      },
+      "fact": "Ticket TICKET-731 is assigned to desk 6.",
+      "exec": "ticket"
+    },
+    {
+      "id": "rag-overlap",
+      "prompts": [
+        "Use search_documents to search my uploaded documents. What are Project Delta's launch date and badge? Cite the sources for both facts."
+      ],
+      "values": [
+        [
+          "17 November",
+          "November 17"
+        ],
+        [
+          "NOVA-204"
+        ]
+      ],
+      "tools": [
+        "search_documents"
+      ],
+      "source": {
+        "filename": "delta.md",
+        "chunkIndex": 0
+      },
+      "additionalSource": {
+        "filename": "delta.md",
+        "chunkIndex": 1
+      },
+      "overlap": true,
+      "fact": "Project Delta launches on 17 November.",
+      "secondFact": "Project Delta's badge is NOVA-204."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "cases": [
+    { "id": "direct-arithmetic", "turns": ["Answer directly without tools: what is 17 plus 25?"], "require": ["42"], "forbidTools": true },
+    { "id": "direct-concept", "turns": ["Answer directly without tools in one sentence: what does HTTP stand for?"], "require": ["Hypertext", "Transfer", "Protocol"], "forbidTools": true },
+    { "id": "history-growth", "historySetup": { "turns": 8, "charsPerTurn": 4000 }, "turns": ["Answer directly without tools: what is 17 plus 25?"], "require": ["42"], "forbidTools": true },
+    { "id": "rag-txt", "turns": ["Search my uploaded documents and report the Project Cobalt launch date."], "rag": { "filename": "launch.txt", "text": "Project Cobalt launches on 17 November.", "chunkIndex": 0 }, "require": ["17 November", "Source: launch.txt, chunk #0"], "requiredTool": "search_documents" },
+    { "id": "rag-markdown", "turns": ["Search my uploaded documents: what is the synthetic emergency color?"], "rag": { "filename": "safety.md", "text": "The synthetic emergency color is amber.", "chunkIndex": 2 }, "require": ["amber", "Source: safety.md, chunk #2"], "requiredTool": "search_documents" },
+    { "id": "rag-pdf-page", "turns": ["Search my uploaded documents for the annual leave allowance."], "rag": { "filename": "handbook.pdf", "text": "The annual leave allowance is 24 days.", "pageNumber": 7, "chunkIndex": 12 }, "require": ["24 days", "Source: handbook.pdf, page 7"], "requiredTool": "search_documents" },
+    { "id": "rag-docx", "turns": ["Search my uploaded documents: which floor is the lab on?"], "rag": { "filename": "office.docx", "text": "The research lab is on floor 6.", "chunkIndex": 4 }, "require": ["floor 6", "Source: office.docx, chunk #4"], "requiredTool": "search_documents" },
+    { "id": "rag-follow-up", "turns": ["My question will be about the synthetic travel policy.", "Search the uploaded documents. What is its meal limit?"], "rag": { "filename": "travel.md", "text": "The synthetic travel policy meal limit is 38 dollars.", "chunkIndex": 1 }, "require": ["38", "Source: travel.md, chunk #1"], "requiredTool": "search_documents" },
+    { "id": "rag-no-match", "turns": ["Search my uploaded documents for the submarine parking rule."], "noMatch": true, "require": ["not found"], "requiredTool": "search_documents" },
+    { "id": "exec-large", "turns": ["Use exec exactly once with this harmless fixed command, then report that it succeeded: node -e \"process.stdout.write('X'.repeat(30000))\""], "require": ["succeed"], "requiredTool": "exec" },
+    { "id": "exec-failure", "turns": ["Use exec exactly once with the fixed command `false`, then truthfully report that it failed."], "require": ["fail"], "requiredTool": "exec" },
+    { "id": "multi-llm-turn", "turns": ["Use search_documents to find the synthetic badge value and answer with its source."], "rag": { "filename": "badge.txt", "text": "The synthetic badge value is NOVA-204.", "chunkIndex": 0 }, "require": ["NOVA-204"], "requiredTool": "search_documents", "minimumLlmCalls": 2 }
+  ]
+}

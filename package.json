@@ -12,7 +12,13 @@
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "evaluate": "tsx scripts/evaluate-rag.ts"
+    "evaluate": "tsx scripts/evaluate-rag.ts",
+    "audit:dashboard": "tsx scripts/audit-dashboard.ts",
+    "audit:benchmark": "tsx scripts/audit-benchmark.ts",
+    "audit:preflight": "tsx scripts/audit-benchmark.ts --preflight",
+    "audit:benchmark:pair": "tsx scripts/audit-benchmark.ts --pair",
+    "audit:compare": "tsx scripts/audit-compare.ts",
+    "audit:report": "tsx scripts/audit-report.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.3.0",
