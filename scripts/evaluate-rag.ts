@@ -20,7 +20,7 @@ let failures = 0;
 try {
   for (const document of dataset.documents) rag.insertDocument(document.userId, document.filename, document.fileType, [{ text: document.text, chunkIndex: 0, ...(document.pageNumber === undefined ? {} : { pageNumber: document.pageNumber }) }], [vector(document.topic)]);
   for (const testCase of dataset.cases) {
-    const results = rag.search(testCase.userId, vector(testCase.topic), 3).filter((result) => result.distance <= 0.8);
+    const results = rag.search(testCase.userId, vector(testCase.topic), 3).filter((result) => result.distance <= 1.0);
     const passed = testCase.expectedSource === null ? results.length === 0 : results[0]?.filename === testCase.expectedSource && results[0].text.includes(testCase.identifyingText ?? "");
     process.stdout.write(`${passed ? "PASS" : "FAIL"} ${testCase.name}\n`);
     if (!passed) failures += 1;

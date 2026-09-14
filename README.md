@@ -42,7 +42,7 @@ Set `TELEGRAM_BOT_TOKEN` and the mandatory comma-separated `ALLOWED_TELEGRAM_USE
 | `RAG_CHUNK_OVERLAP_CHARS` | `300` | Characters overlapped between chunks |
 | `EMBEDDING_BATCH_SIZE` | `16` | Index inputs per `/api/embed` call |
 | `RAG_TOP_K` | `5` | Nearest chunks requested |
-| `RAG_MAX_DISTANCE` | `0.8` | Maximum accepted L2 distance |
+| `RAG_MAX_DISTANCE` | `1.0` | Maximum accepted L2 distance |
 | `RAG_MAX_CONTEXT_CHARS` | `8000` | Maximum retrieved chunk text returned to the model |
 | `SKILLS_DIR` | `./skills` | Local `*/SKILL.md` directory |
 | `AGENT_WORKSPACE_DIR` | `./agent-workspace` | Initial `exec` directory |
@@ -64,7 +64,7 @@ TXT and Markdown use UTF-8; DOCX uses Mammoth; PDF.js extracts text page by page
 
 The RAG database has `documents`, ordered `chunks`, and a sqlite-vec `vec0` table whose row IDs equal chunk IDs. Foreign keys connect chunks to documents; vector rows carry `user_id` as a partition key and `document_id` metadata. Index inserts and deletions are transactions, with vector rows explicitly deleted. The `search_documents` model tool accepts only a standalone `query`; trusted ownership is injected by the runtime. Its KNN query contains exact `user_id = ?` filtering, then joins and defensively rechecks ownership, so global results are never post-filtered.
 
-Indexing and queries use the same 768-dimensional `embeddinggemma` vectors. Retrieval uses normalized-vector L2 distance, asks for Top 5, rejects distances above 0.8, preserves nearest-first order, and returns only complete chunks within 8,000 text characters. These conservative defaults bound model context; tune the threshold only with evaluation evidence.
+Indexing and queries use the same 768-dimensional `embeddinggemma` vectors. Retrieval uses normalized-vector L2 distance, asks for Top 5, rejects distances above 1.0, preserves nearest-first order, and returns only complete chunks within 8,000 text characters. For unit vectors, L2 `1.0` corresponds to cosine similarity `0.5`. The earlier `0.8` default rejected a manually verified relevant result at `0.9717`; the revised threshold admits that result while retaining a relevance cutoff. Tune it further only with evaluation evidence.
 
 Document-derived answers must use retrieved text, cite the exact filename and PDF page (or zero-based chunk number when no page exists), and say the information was not found in uploaded documents when retrieval does not support an answer. Retrieved text is treated as untrusted data. Corrupt, protected, empty, image-only, oversized, duplicate, unavailable, timeout, embedding, database, and model failures receive concise messages without paths, SQL, contents, vectors, or secrets.
 
@@ -94,6 +94,10 @@ npm start
 Manual demonstration: upload a text PDF and ask a question whose answer appears on a known page; verify the answer includes `Source: filename.pdf, page N`. Ask for absent information and verify a not-found answer. Upload additional formats, use `/documents`, then delete one exact name and confirm it no longer retrieves. With two allowlisted senders in a group, upload different documents and verify each sender can search/list/delete only their own. Finally run the test and evaluation commands above.
 
 Runtime databases and WAL/SHM files, temporary documents, build output, coverage, dependencies, `.env`, and the agent workspace are ignored by Git. Logs contain only safe categories and metadata, never prompts, document contents, tool arguments/results, vectors, responses, or secrets.
+
+Runtime progress is written to stderr (the terminal running `npm run dev` or `npm start`). Structured `event=...` records cover Telegram receipt/reply, document download, extraction, chunking, embedding, storage, retrieval, each model/tool step, completion, durations, counts, and safe failures. For a document question, the normal path is `model_call_completed ... tool_calls=1`, `tool_started ... tool="search_documents"`, `document_search_completed`, and then another model call. If the model instead asks the user to wait or claims that uploaded documents lack the information without searching, the agent rejects that unverified response and logs `document_search_fallback_started`; it searches with the current prompt through the same trusted-user retrieval path and gives the result back to the model. Ordinary direct answers do not trigger this narrow fallback. Prompt and response text, document content, tool arguments/results, vectors, paths, tokens, and secrets are never logged.
+
+`document_search_candidates` reports only the number of user-filtered KNN candidates, nearest L2 distance, and configured maximum distance. A positive candidate count followed by `no_match` means the distance threshold rejected every candidate; zero candidates indicates an indexing/vector-visibility problem instead.
 
 ## Security warning
 

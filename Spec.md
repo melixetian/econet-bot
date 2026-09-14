@@ -100,6 +100,10 @@ The worker processes requests sequentially to prevent concurrent history and doc
 
 Never log tokens, user messages, document text, model responses, tool arguments/output, file contents, or secrets. Opaque IDs, filenames, sizes, durations, counts, and safe error categories are acceptable.
 
+Operational diagnostics on stderr report document download, validation, extraction, chunking, embedding, storage, retrieval, model/tool steps, completion, duration, and safe failure categories. They contain lengths and counts where useful, but never the protected contents listed above. A model must not emit a provisional "please wait" response or claim that uploaded documents lack information without searching. If it does, the bounded agent loop rejects that unverified final response, searches with the current user prompt through the same trusted-user RAG path, and gives the result back to the model. This narrow fallback does not search for ordinary direct answers.
+
+Retrieval diagnostics include only the user-filtered candidate count, nearest distance, and configured threshold before filtering. They never include chunk text, vectors, query text, filenames returned by search, or tool results.
+
 ## 6. Telegram behavior
 
 ### 6.1 Existing behavior
@@ -316,7 +320,7 @@ Retrieval:
 
 Return distinct `no_match` when no owned document/result qualifies. Limit returned text to `RAG_MAX_CONTEXT_CHARS`, retaining highest-ranked complete chunks and marking omitted results. Never return another user's data.
 
-Use L2 distance with Ollama-normalized embeddings. Default `RAG_MAX_DISTANCE=0.8`; document and adjust it only when evaluation/manual evidence justifies it.
+Use L2 distance with Ollama-normalized embeddings. Default `RAG_MAX_DISTANCE=1.0`, equivalent to a cosine-similarity floor of `0.5` for unit vectors. The original `0.8` threshold rejected a manually verified relevant `embeddinggemma` result at L2 distance `0.9717`; retain the threshold rather than removing distance filtering, and adjust it further only when evaluation/manual evidence justifies it.
 
 ## 13. Agent behavior
 
@@ -363,7 +367,7 @@ For chat:
 1. load history and current user message;
 2. call the model with `exec` and `search_documents`;
 3. append the complete response transiently;
-4. if no calls exist, require content, persist the final turn, and return it;
+4. if no calls exist, require content; reject a provisional response or unverified uploaded-document no-answer and perform the narrow document-search fallback when another step remains, otherwise persist and return the final turn;
 5. otherwise execute calls sequentially with structured tool messages;
 6. repeat within `AGENT_MAX_STEPS`.
 
@@ -402,7 +406,7 @@ Do not expose stacks, paths, SQL, content, provider bodies, or secrets. Preserve
 | `RAG_CHUNK_OVERLAP_CHARS` | no | `300` | Chunk overlap |
 | `EMBEDDING_BATCH_SIZE` | no | `16` | Inputs per embed call |
 | `RAG_TOP_K` | no | `5` | Retrieved chunks |
-| `RAG_MAX_DISTANCE` | no | `0.8` | Accepted L2 distance |
+| `RAG_MAX_DISTANCE` | no | `1.0` | Accepted L2 distance |
 | `RAG_MAX_CONTEXT_CHARS` | no | `8000` | Text returned to model |
 | `SKILLS_DIR` | no | `./skills` | Skill directory |
 | `AGENT_WORKSPACE_DIR` | no | `./agent-workspace` | Exec cwd |

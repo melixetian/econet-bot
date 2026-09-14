@@ -109,7 +109,7 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env): WorkerCo
     ragChunkOverlapChars,
     embeddingBatchSize: readPositiveInteger("EMBEDDING_BATCH_SIZE", env.EMBEDDING_BATCH_SIZE, 16),
     ragTopK: readPositiveInteger("RAG_TOP_K", env.RAG_TOP_K, 5),
-    ragMaxDistance: readNonNegativeNumber("RAG_MAX_DISTANCE", env.RAG_MAX_DISTANCE, 0.8),
+    ragMaxDistance: readNonNegativeNumber("RAG_MAX_DISTANCE", env.RAG_MAX_DISTANCE, 1.0),
     ragMaxContextChars: readPositiveInteger("RAG_MAX_CONTEXT_CHARS", env.RAG_MAX_CONTEXT_CHARS, 8_000),
     skillsDir: resolve(env.SKILLS_DIR?.trim() || "./skills"),
     agentWorkspaceDir: resolve(env.AGENT_WORKSPACE_DIR?.trim() || "./agent-workspace"),
