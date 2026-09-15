@@ -10,7 +10,7 @@ import { loadSkills } from "../src/agent/skills.js";
 import { OllamaProvider } from "../src/inference/providers/ollama.js";
 import { SqliteAudit } from "../src/audit/sqlite-audit.js";
 import { benchmarkSettings, effectiveConfig, preflight, compatibleSettings, verifyPreflightEvidence, BenchmarkError } from "../src/audit/benchmark-preflight.js";
-import { BenchmarkStore, evidenceLog, safeLabel } from "../src/audit/benchmark-store.js";
+import { BenchmarkStore, evidenceDirectory, evidenceLog, safeLabel, utcEvidenceId } from "../src/audit/benchmark-store.js";
 import { runCase } from "../src/audit/benchmark-runner.js";
 import { INVALID_REASONS, type Dataset } from "../src/audit/benchmark-cases.js";
 import { compareBenchmarks, renderComparison } from "../src/audit/comparison.js";
@@ -19,13 +19,14 @@ import type { AuditProfile } from "../src/audit/types.js";
 
 function argument(name: string): string | undefined { const index = process.argv.indexOf(name); return index < 0 ? undefined : process.argv[index + 1]; }
 const root = fileURLToPath(new URL("../", import.meta.url));
-const directory = join(root, "reports", "audit-v2");
 async function main(): Promise<void> {
   const pair = process.argv.includes("--pair"), onlyPreflight = process.argv.includes("--preflight");
   const requested = argument("--profile");
   const labels = pair ? [argument("--before"), argument("--after")] : [onlyPreflight ? "preflight" : argument("--label")];
   if (labels.some((label) => !label || !safeLabel(label)) || (pair && labels[0] === labels[1]) || (!pair && !onlyPreflight && requested !== "baseline" && requested !== "optimized")) throw new BenchmarkError("invalid_selector");
   const safeLabels = labels as string[];
+  const evidenceId = argument("--evidence-id") ?? (onlyPreflight ? utcEvidenceId() : safeLabels[0]!.replace(/^(before|after)-/, ""));
+  const directory = evidenceDirectory(root, evidenceId);
   const log = evidenceLog(directory, onlyPreflight ? "preflight" : pair ? "pair" : "execution", safeLabels[0]!);
   const write = (line: string) => { log.write(line); process.stdout.write(line + "\n"); };
   let audit: SqliteAudit | undefined, store: BenchmarkStore | undefined, lock: number | undefined, lockPath: string | undefined;

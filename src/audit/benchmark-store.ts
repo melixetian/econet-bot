@@ -7,6 +7,13 @@ import type { AuditProfile } from "./types.js";
 import type { CaseDiagnostics } from "./benchmark-cases.js";
 
 export function safeLabel(label: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(label); }
+export function utcEvidenceId(date = new Date()): string {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+export function evidenceDirectory(root: string, evidenceId: string): string {
+  if (!safeLabel(evidenceId)) throw new BenchmarkError("invalid_selector");
+  return join(root, "reports", "audit-" + evidenceId);
+}
 export function evidenceLog(directory: string, kind: string, label: string): { path: string; write(text: string): void; close(): void } {
   if (!safeLabel(label) || !/^[a-z-]+$/.test(kind)) throw new BenchmarkError("invalid_selector");
   mkdirSync(directory, { recursive: true });
@@ -46,4 +53,3 @@ export class BenchmarkStore {
   }
   close(): void { this.db.close(); }
 }
-

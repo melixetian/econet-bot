@@ -393,10 +393,13 @@ Each case defines deterministic pass conditions such as required tool name, exac
 Provide commands equivalent to:
 
 ```bash
+npm run audit:run
 npm run audit:preflight
 npm run audit:benchmark:pair -- --before before-v3 --after after-v3
 npm run audit:compare -- --before before-v3 --after after-v3
 ```
+
+The one-command wrapper creates fresh timestamped labels/output by default. It stops before measurement if preflight fails. Once a paired measurement begins, it attempts comparison, dashboard, and report generation even when the pair or comparison returns non-zero for invalid evidence or failed acceptance, and finally returns non-zero itself. It accepts optional explicit before label, after label, and Markdown path. This avoids both unsafe unconditional `;` chaining and incomplete artifact collection caused by all-`&&` chaining.
 
 The benchmark:
 
@@ -436,13 +439,13 @@ The compare command exits non-zero when compatibility or acceptance checks fail 
 
 ### 11.4 Corrected v2 validity and reproducibility
 
-The first audit is invalid evidence and cannot demonstrate either success or regression. Preserve its files/database records. Additive migrations mark pre-v2 labels invalid; no prior records are deleted.
+The first audit is invalid evidence and cannot demonstrate either success or regression. The obsolete v1 benchmark fixture is removed; additive migrations still mark any pre-v2 database labels invalid and preserve their records.
 
 A label cannot support comparison if any case timed out, failed to complete all prescribed turns, reached the step limit, lacks linked audit records, or contains any successful LLM call without validated authoritative input/output counters. Failed provider calls also make the case incomplete. Never sum available counters into a supposedly comparable partial total. Exact input/output/gross/cache/reasoning/cost totals and all reduction/guardrail calculations are N/A for invalid/incompatible comparisons. Return non-zero for missing results, invalidity, incompatibility or failed acceptance.
 
 Compare model/digest, dataset SHA-256, case IDs/counts, complete run links, effective options, all benchmark limits, prices, runtime environment, implementation revision and invocation cohort. Only a paired execution is comparable: it shares one loaded implementation, synthetic dataset and bundled-Skills snapshot in memory, with an opaque random cohort. Separate single-profile invocations are retained for diagnostics but are deliberately incompatible. This avoids persisting reusable implementation/Skill content hashes while supporting an uncommitted working tree. The required static synthetic dataset hash and provider model digest are artifact identifiers, never hashes of user content.
 
-Reject duplicate labels before any model request, including duplicate before/after names. An explicit `--overwrite` archives the previous label under an opaque name and preserves all its records. Do not silently overwrite any output file. Save separate timestamp-and-UUID logs for preflight, each profile, the paired invocation and comparison in `reports/audit-v2/`. A failed invocation must never present acceptance from previously existing labels.
+Reject duplicate labels before any model request, including duplicate before/after names. An explicit `--overwrite` archives the previous label under an opaque name and preserves all its records. Do not silently overwrite any output file. A complete wrapper run saves separate timestamp-and-UUID logs for preflight, each profile, the paired invocation and comparison in one `reports/audit-<UTC timestamp>/` directory matching its report. Direct commands derive the suffix from the baseline label or accept `--evidence-id <safe-id>`. A failed invocation must never present acceptance from previously existing labels.
 
 Preflight must finish before measured cases. Build/check all synthetic fixtures; verify local loopback Ollama availability, configured model/digest, advertised context support, Ollama version, a usage-bearing warmup response and effective loaded context. Both profiles have identical `temperature=0`, `seed=731`, `num_ctx=16384`, `num_predict=256`, `stream=false`, `think=false` by default. Record effective values. Verify paired settings before starting; repeat model/context preflight before optimized measurement. Warmup is unmeasured. After each profile, read-only model/digest, server-version and loaded-context checks must still match preflight; failure invalidates that label.
 

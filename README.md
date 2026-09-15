@@ -155,6 +155,20 @@ Override benchmark context/timeouts using `TOKEN_AUDIT_BENCHMARK_NUM_CTX`, `TOKE
 
 Use the paired command. Both profiles share one loaded implementation/dataset/Skills snapshot and a random cohort; separate single-profile commands remain diagnostic and intentionally cannot be compared across invocations. This avoids reusable content hashes and comparison across uncommitted code/Skill changes. Run with bot/worker stopped. A benchmark lock prevents simultaneous benchmark writers; after a crash, remove only `<TOKEN_AUDIT_DB_PATH>.benchmark.lock` after confirming no benchmark is running.
 
+For a complete run, use the wrapper below. With no arguments it creates fresh UTC-timestamped baseline/optimized labels, a matching `reports/audit-<timestamp>/` log directory, and a matching Markdown filename. Preflight is a hard gate. After measurement starts, the wrapper still runs comparison, dashboard, and report generation when the pair exits non-zero because acceptance failed. The wrapper itself remains non-zero when evidence is invalid or either acceptance threshold fails.
+
+```sh
+npm run audit:run
+```
+
+Explicit fresh labels and output are also supported:
+
+```sh
+npm run audit:run -- before-v6 after-v6 reports/token-audit-v6.md
+```
+
+Do not join the individual commands exclusively with `&&`: a valid comparison that misses a threshold intentionally returns non-zero and would skip the dashboard/report. Do not join all commands with `;` either, because that would measure after a failed preflight. The wrapper implements the required control flow.
+
 ```sh
 npm run typecheck
 npm test
@@ -166,7 +180,7 @@ npm run audit:dashboard
 npm run audit:report -- --before before-v3 --after after-v3 --out reports/token-audit-v3.md
 ```
 
-The paired command automatically saves separate timestamp-and-UUID execution logs for each profile, a pair log, and comparison output in `reports/audit-v2/`; preflight and explicit comparison also save distinct logs. Logs contain safe diagnostics only. Reusing a label fails before model access unless `--overwrite` is explicit; overwrite archives the prior label and retains all records. Reports use exclusive creation and never overwrite existing files. Use fresh labels/output names for later evidence.
+The wrapper saves separate timestamp-and-UUID execution logs for preflight, each profile, the paired invocation, and comparison in one `reports/audit-<timestamp>/` directory. Direct paired and comparison commands derive the directory suffix from the baseline label (for example, `before-v3` writes to `reports/audit-v3/`); `--evidence-id <safe-id>` selects an explicit shared suffix. Logs contain safe diagnostics only. Reusing a label fails before model access unless `--overwrite` is explicit; overwrite archives the prior label and retains all records. Reports use exclusive creation and never overwrite existing files. Use fresh labels/output names for later evidence.
 
 Timeouts, incomplete cases, missing authoritative usage on any successful provider call, missing records and incompatible model/dataset/options/limits/pricing/cohort invalidate comparison: exact totals, reductions and quality-drop calculations display **N/A**, and comparison exits non-zero. A failed or pre-provider attempt makes its case incomplete but is not falsely reported as missing provider usage; usage completeness applies to calls the provider completed successfully. Legacy labels stay invalid after additive migration. Completed scoring failures (including duplicate/missing tools, missing query terms, values, metadata or citations) remain measured quality failures, not discarded cases. Full fixture payloads are single-use per expected call: duplicate or unexpected weak-model calls receive small structured feedback, remain visible in tool counts, and cannot repeatedly inflate context. Delivery diagnostics prove whether initial full results and later receipts occurred.
 

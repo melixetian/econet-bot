@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { compareBenchmarks, renderComparison } from "../src/audit/comparison.js";
 import { renderReport } from "../src/audit/report.js";
 import { SqliteAudit } from "../src/audit/sqlite-audit.js";
-import { BenchmarkStore, evidenceLog } from "../src/audit/benchmark-store.js";
+import { BenchmarkStore, evidenceDirectory, evidenceLog, utcEvidenceId } from "../src/audit/benchmark-store.js";
 import type { CaseDiagnostics } from "../src/audit/benchmark-cases.js";
 
 const diagnostics: CaseDiagnostics = { completion: "success", reasons: [], expectedTools: [], observedTools: [], llmCalls: 1, toolCalls: 0, usageComplete: true, contextCompacted: false, toolCompacted: false, fullDelivery: false, receiptDelivery: false, usageIssues: [], toolCountsExpected: true, valuesObserved: true, queryTermsObserved: true, sourceMetadataObserved: true, citationsObserved: true };
@@ -106,5 +106,11 @@ describe("benchmark validity and evidence", () => {
       expect(readFileSync(a.path, "utf8")).toBe("valid\n");
       expect(() => evidenceLog(root, "baseline", "../unsafe")).toThrow();
     } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+  it("creates safe timestamp-named evidence directories", () => {
+    const root = join(tmpdir(), "audit-root");
+    expect(utcEvidenceId(new Date("2026-09-15T18:37:46.123Z"))).toBe("20260915T183746Z");
+    expect(evidenceDirectory(root, "20260915T183746Z")).toBe(join(root, "reports", "audit-20260915T183746Z"));
+    expect(() => evidenceDirectory(root, "../unsafe")).toThrow("invalid_selector");
   });
 });

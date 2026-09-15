@@ -42,6 +42,7 @@ Commands are defined in `package.json`:
 - `npm run audit:benchmark -- --profile baseline|optimized --label <label>` — run the real local Ollama token benchmark. Agents must not run it.
 - `npm run audit:preflight` — validate fixtures and local Ollama before measurement. Agents must not run it.
 - `npm run audit:benchmark:pair -- --before <label> --after <label>` — run comparable profiles in one isolated cohort and save distinct logs/comparison. Agents must not run it.
+- `npm run audit:run` — run preflight and a fresh timestamp-labelled pair, then collect comparison, dashboard, and report artifacts even when acceptance fails. Agents must not run it.
 - `npm run audit:compare -- --before <label> --after <label>` — compare compatible benchmark results without model access.
 - `npm run audit:dashboard` — inspect privacy-safe local audit metrics without model access.
 - `npm run audit:report -- --before <label> --after <label> --out <path>` — generate the Markdown audit report.

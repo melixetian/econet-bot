@@ -17,6 +17,7 @@
     "audit:benchmark": "tsx scripts/audit-benchmark.ts",
     "audit:preflight": "tsx scripts/audit-benchmark.ts --preflight",
     "audit:benchmark:pair": "tsx scripts/audit-benchmark.ts --pair",
+    "audit:run": "sh scripts/run-token-audit.sh",
     "audit:compare": "tsx scripts/audit-compare.ts",
     "audit:report": "tsx scripts/audit-report.ts"
   },
