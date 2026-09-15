@@ -1,14 +1,15 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { loadModelEvaluationConfig, runModelEvaluation } from "../src/evaluation/benchmark.js";
+import { loadModelEvaluationConfig, parseEvaluationModelArguments, runModelEvaluation } from "../src/evaluation/benchmark.js";
 import { parseEvaluationDataset } from "../src/evaluation/dataset.js";
 import { prepareModelEvaluationOutputDirectory, writeModelEvaluationReports } from "../src/evaluation/report.js";
 
 const datasetPath = fileURLToPath(new URL("../tests/fixtures/llm-evaluation-cases.json", import.meta.url));
 
 async function main(): Promise<void> {
-  const config = loadModelEvaluationConfig();
+  const modelArguments = parseEvaluationModelArguments(process.argv.slice(2));
+  const config = loadModelEvaluationConfig(process.env, process.cwd(), modelArguments);
   const datasetBytes = readFileSync(datasetPath);
   let raw: unknown;
   try { raw = JSON.parse(datasetBytes.toString("utf8")); }
@@ -23,7 +24,7 @@ async function main(): Promise<void> {
 }
 
 await main().catch((error: unknown) => {
-  const message = error instanceof Error && /^(?:EVAL_|OLLAMA_BASE_URL|LLM_TIMEOUT_MS|Evaluation dataset|Dataset|Case )/.test(error.message)
+  const message = error instanceof Error && /^(?:EVAL_|OLLAMA_BASE_URL|LLM_TIMEOUT_MS|Evaluation dataset|Dataset|Case |CLI model|Use --model_|Both --model_|--model_)/.test(error.message)
     ? error.message
     : "check configuration, report-directory access, and local Ollama availability";
   process.stderr.write(`Model evaluation failed: ${message}.\n`);

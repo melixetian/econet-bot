@@ -98,11 +98,13 @@ npm run evaluate
 
 `npm test` (or the explicit alias `npm run test:offline`) is fully offline. It includes the version-1, 12-case behavioral harness dataset at `tests/fixtures/llm-evaluation-cases.json`: four prompt-injection, four hallucination/no-answer, and four memory/reset cases. Fake providers, in-memory history, and fake tools test the harness; these results do not claim that a real model is good.
 
-The live behavioral benchmark is opt-in and separate from the default tests. First use `ollama list`, then manually install any missing candidates with `ollama pull <model>`. Choose at least two installed tool-capable chat models and run:
+The live behavioral benchmark is opt-in and separate from the default tests. First use `ollama list`, then manually install any missing candidates with `ollama pull <model>`. For a lightweight comparison with the existing `qwen3:1.7b`, `llama3.2:3b` is a roughly 2 GB tool-capable candidate. Run the two-model benchmark with separate parameters (the first `--` tells npm to forward the remaining arguments):
 
 ```sh
-EVAL_MODELS="model-a,model-b" npm run eval:models
+npm run eval:models -- --model_1 qwen3:1.7b --model_2 llama3.2:3b
 ```
+
+`EVAL_MODELS="model-a,model-b" npm run eval:models` remains available for two or more candidates and automation. Explicit CLI model parameters take precedence over `EVAL_MODELS` and must be provided together with distinct values.
 
 It evaluates models sequentially with identical prompts, temperature, fake tools, and isolated in-memory histories. It calls only the configured Ollama chat endpoint; it does not pull models, contact Telegram, run shell commands, embed/search real documents, open production databases, or update `OLLAMA_MODEL`/`.env`. Generated `artifacts/model-evaluation/results.json` contains attempt records and aggregates; `report.md` contains the comparison and recommendation. Full outputs are omitted unless explicitly enabled, in which case only bounded canary-redacted previews are stored.
 

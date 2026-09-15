@@ -105,15 +105,34 @@ function readTemperature(value: string | undefined): number {
   return temperature;
 }
 
-function readModels(value: string | undefined): string[] {
+function readModels(value: string | undefined, source = "EVAL_MODELS"): string[] {
   const models = [...new Set((value ?? "").split(",").map((model) => model.trim()).filter(Boolean))];
-  if (models.length < 2) throw new Error("EVAL_MODELS must contain at least two distinct comma-separated installed model names");
-  if (models.some((model) => !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(model))) throw new Error("EVAL_MODELS contains an invalid model name");
+  if (models.length < 2) throw new Error(`${source} must contain at least two distinct comma-separated installed model names`);
+  if (models.some((model) => !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(model))) throw new Error(`${source} contains an invalid model name`);
   return models;
 }
 
-export function loadModelEvaluationConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): ModelEvaluationConfig {
-  const models = readModels(env.EVAL_MODELS);
+export function parseEvaluationModelArguments(argv: readonly string[]): string[] | undefined {
+  if (argv.length === 0) return undefined;
+  const values = new Map<string, string>();
+  for (let index = 0; index < argv.length; index += 2) {
+    const flag = argv[index];
+    const value = argv[index + 1];
+    if ((flag !== "--model_1" && flag !== "--model_2") || value === undefined || value.startsWith("--") || values.has(flag)) {
+      throw new Error("Use --model_1 <installed-model> --model_2 <installed-model>");
+    }
+    values.set(flag, value);
+  }
+  const first = values.get("--model_1");
+  const second = values.get("--model_2");
+  if (!first?.trim() || !second?.trim()) throw new Error("Both --model_1 and --model_2 are required together");
+  if (first.trim() === second.trim()) throw new Error("--model_1 and --model_2 must be distinct");
+  const models = readModels(`${first},${second}`, "CLI model parameters");
+  return models;
+}
+
+export function loadModelEvaluationConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd(), modelArguments?: readonly string[]): ModelEvaluationConfig {
+  const models = modelArguments ? readModels(modelArguments.join(","), "CLI model parameters") : readModels(env.EVAL_MODELS);
   const ollama = loadOllamaChatConfig(env);
   const worker: WorkerConfig = {
     inferenceProvider: "ollama", ollamaBaseUrl: ollama.ollamaBaseUrl, ollamaModel: models[0]!, ollamaEmbeddingModel: models[0]!,

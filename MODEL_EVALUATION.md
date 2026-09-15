@@ -31,11 +31,17 @@ Use `ollama list` to see local models. Install candidates yourself when needed:
 ollama pull <model>
 ```
 
-The benchmark never pulls or removes a model. Configure at least two distinct installed chat models:
+The benchmark never pulls or removes a model. For a two-model run, pass both model names separately. The `--` after the npm script name is required so npm forwards the flags:
+
+```sh
+npm run eval:models -- --model_1 qwen3:1.7b --model_2 llama3.2:3b
+```
+
+The CLI pair takes precedence over `EVAL_MODELS`. The environment variable remains useful for automation or comparisons with more than two models. Configure the remaining controls as follows:
 
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
-| `EVAL_MODELS` | yes | none | Comma-separated installed Ollama chat models, at least two |
+| `EVAL_MODELS` | unless CLI pair is used | none | Comma-separated installed Ollama chat models, at least two |
 | `EVAL_REPETITIONS` | no | `1` | Attempts per model/case, integer 1–5 |
 | `EVAL_TEMPERATURE` | no | `0` | Shared non-negative generation temperature |
 | `EVAL_OUTPUT_DIR` | no | `./artifacts/model-evaluation` | Generated report directory |
@@ -50,10 +56,16 @@ npm test
 npm run typecheck
 ```
 
-Live comparison:
+Live two-model comparison:
 
 ```sh
-EVAL_MODELS="model-a,model-b" npm run eval:models
+npm run eval:models -- --model_1 qwen3:1.7b --model_2 llama3.2:3b
+```
+
+Equivalent environment-variable form:
+
+```sh
+EVAL_MODELS="qwen3:1.7b,llama3.2:3b" npm run eval:models
 ```
 
 Runs are sequential to avoid local model contention. A missing, unreachable, or timed-out model is recorded as an `error`; remaining cases and candidates continue where safe. Configuration and dataset errors stop before any model request.
@@ -85,7 +97,7 @@ Expected report shape (values appear only after a run):
 5. If still tied, select the lower average output-token count.
 6. If none is eligible, report `No model meets the acceptance threshold` and recommend no winner.
 
-If every listed comparison metric is exactly tied, the earlier model in `EVAL_MODELS` is retained as the deterministic result; this does not add a quality criterion.
+If every listed comparison metric is exactly tied, the earlier model in the supplied CLI pair or `EVAL_MODELS` list is retained as the deterministic result; this does not add a quality criterion.
 
 The tool only recommends. It never edits `OLLAMA_MODEL`, `.env`, or any production configuration.
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Agent } from "../src/agent/agent.js";
 import { EVALUATION_CANARIES, evaluateCaseOutputs, evaluateExpectations, redactEvaluationPreview } from "../src/evaluation/assertions.js";
-import { aggregateModel, loadModelEvaluationConfig, recommendModel, runEvaluationAttempt, type EvaluationAttempt, type ModelAggregate } from "../src/evaluation/benchmark.js";
+import { aggregateModel, loadModelEvaluationConfig, parseEvaluationModelArguments, recommendModel, runEvaluationAttempt, type EvaluationAttempt, type ModelAggregate } from "../src/evaluation/benchmark.js";
 import { EvaluationDatasetError, parseEvaluationDataset, type EvaluationCase, type Expectations } from "../src/evaluation/dataset.js";
 import { executeEvaluationCase } from "../src/evaluation/harness.js";
 import { renderModelEvaluationReport } from "../src/evaluation/report.js";
@@ -136,6 +136,14 @@ describe("model benchmark isolation, configuration, and selection", () => {
     expect(() => loadModelEvaluationConfig({ EVAL_MODELS: "one,two", EVAL_REPETITIONS: "6" })).toThrow("EVAL_REPETITIONS");
     expect(loadModelEvaluationConfig({ EVAL_MODELS: "one,two" }, "/tmp")).toMatchObject({ models: ["one", "two"], repetitions: 1, temperature: 0, includeOutputPreviews: false });
     expect(() => loadModelEvaluationConfig({ EVAL_MODELS: "one,two", TOKEN_AUDIT_PROFILE: "invalid", CHAT_DB_PATH: "\0unused" }, "/tmp")).not.toThrow();
+  });
+
+  it("accepts two separate CLI model parameters and gives them precedence over EVAL_MODELS", () => {
+    const selected = parseEvaluationModelArguments(["--model_1", "qwen3:1.7b", "--model_2", "llama3.2:3b"]);
+    expect(selected).toEqual(["qwen3:1.7b", "llama3.2:3b"]);
+    expect(loadModelEvaluationConfig({ EVAL_MODELS: "ignored-a,ignored-b" }, "/tmp", selected).models).toEqual(selected);
+    expect(() => parseEvaluationModelArguments(["--model_1", "only-one"])).toThrow("Both --model_1 and --model_2");
+    expect(() => parseEvaluationModelArguments(["--model_1", "same", "--model_2", "same"])).toThrow("distinct");
   });
 
   it("uses the synthetic exec host and never executes the requested command", async () => {
