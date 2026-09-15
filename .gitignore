@@ -2,6 +2,7 @@
 node_modules/
 dist/
 coverage/
+artifacts/model-evaluation/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

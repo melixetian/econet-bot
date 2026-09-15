@@ -5,11 +5,16 @@ const MAX_OUTPUT_BYTES = 32 * 1024;
 export const EXEC_TOOL: ToolDefinition = { type: "function", function: { name: "exec", description: "Run one shell command when external data or a real system action is required.", parameters: { type: "object", additionalProperties: false, required: ["command"], properties: { command: { type: "string", description: "The shell command to run." } } } } };
 function safeEnvironment(): NodeJS.ProcessEnv { const env: NodeJS.ProcessEnv = {}; for (const key of ["PATH", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TMP", "TEMP", "SystemRoot", "ComSpec"]) if (process.env[key]) env[key] = process.env[key]; return env; }
 function result(data: Record<string, unknown>): string { return JSON.stringify(data); }
-export async function executeToolCall(call: ToolCall, workspaceDir: string, timeoutMs: number, signal?: AbortSignal): Promise<string> {
-  if (call.name !== "exec") return result({ ok: false, error: "Unknown tool" });
-  if (typeof call.arguments !== "object" || call.arguments === null || Array.isArray(call.arguments) || Object.keys(call.arguments).length !== 1 || typeof (call.arguments as Record<string, unknown>).command !== "string") return result({ ok: false, error: "exec requires exactly one command string" });
+export function validateExecToolCall(call: ToolCall): string | null {
+  if (call.name !== "exec") return "Unknown tool";
+  if (typeof call.arguments !== "object" || call.arguments === null || Array.isArray(call.arguments) || Object.keys(call.arguments).length !== 1 || typeof (call.arguments as Record<string, unknown>).command !== "string") return "exec requires exactly one command string";
   const command = (call.arguments as Record<string, unknown>).command as string;
-  if (command.trim().length === 0 || command.includes("\0")) return result({ ok: false, error: "exec requires a non-empty command without NUL bytes" });
+  return command.trim().length === 0 || command.includes("\0") ? "exec requires a non-empty command without NUL bytes" : null;
+}
+export async function executeToolCall(call: ToolCall, workspaceDir: string, timeoutMs: number, signal?: AbortSignal): Promise<string> {
+  const validationError = validateExecToolCall(call);
+  if (validationError) return result({ ok: false, error: validationError });
+  const command = (call.arguments as Record<string, unknown>).command as string;
   await mkdir(workspaceDir, { recursive: true });
   return new Promise((resolve) => {
     const started = Date.now(); let stdout = ""; let stderr = ""; let truncated = false; let timedOut = false; let settled = false;

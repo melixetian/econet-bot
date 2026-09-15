@@ -25,12 +25,14 @@ export function parseOllamaUsage(body: Record<string, unknown>): ProviderRespons
   if (!nonNegativeInteger(input) || !nonNegativeInteger(output)) { logEvent("worker", "audit_usage_invalid", { category: "invalid_token_count" }); return null; }
   if (cached !== undefined && (!nonNegativeInteger(cached) || cached > input)) { logEvent("worker", "audit_usage_invalid", { category: "invalid_cached_count" }); return null; }
   const providerDurationMs = durationMilliseconds(body.total_duration);
+  const generationDurationMs = durationMilliseconds(body.eval_duration);
   return {
     inputTokens: input,
     outputTokens: output,
     cachedTokens: cached === undefined ? null : cached,
     reasoningTokens: null,
     ...(providerDurationMs === undefined ? {} : { providerDurationMs }),
+    ...(generationDurationMs === undefined ? {} : { generationDurationMs }),
   };
 }
 // Translate the provider-neutral contract only at the transport boundary.

@@ -10,6 +10,8 @@ export const HELP_TEXT = "I remember this chat. Send /new to start over without 
 export const INFERENCE_ERROR_TEXT = "The language model is temporarily unavailable. Please try again.";
 export const ACCESS_DENIED_TEXT = "Access denied.";
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
+export const MAX_USER_MESSAGE_CHARS = 4096;
+export const USER_MESSAGE_TOO_LONG_TEXT = `Message is too long. Maximum length is ${MAX_USER_MESSAGE_CHARS} characters.`;
 const DOCUMENT_RECEIVED_TEXT = "📄 Document received.\n\nProcessing...";
 const DOCUMENT_READY_TEXT = "✅ Document is ready.\n\nYou can now ask questions about it.";
 
@@ -23,10 +25,46 @@ export interface InferenceClient {
 export interface IncomingMessage { text?: unknown; entities?: ReadonlyArray<{ type: string; offset: number }>; }
 export interface BotDocumentOptions { documentTempDir: string; maxDocumentBytes: number; documentTimeoutMs: number; fetch?: typeof fetch; createId?: () => string; }
 export interface UploadRequest { token: string; userId: string; fileId: string; filename: unknown; knownSize: unknown; inference: InferenceClient; options: BotDocumentOptions; getRemotePath(fileId: string): Promise<string | undefined>; reply(text: string): Promise<unknown>; }
+export interface TextMessageRequest { message: IncomingMessage; conversationId: string; userId: string; inference: InferenceClient; reply(text: string): Promise<unknown>; }
 export function isAuthorizedSender(senderId: number | undefined, allowedUserIds: ReadonlySet<string>): boolean { return senderId !== undefined && allowedUserIds.has(String(senderId)); }
 
-export function getInferencePrompt(message: IncomingMessage): string | null { if (typeof message.text !== "string" || message.text.trim().length === 0) return null; const beginsWithCommand = message.text.startsWith("/") || message.entities?.some((entity) => entity.type === "bot_command" && entity.offset === 0) === true; return beginsWithCommand ? null : message.text; }
+export type InferencePromptValidation =
+  | { status: "accepted"; prompt: string }
+  | { status: "ignored" }
+  | { status: "rejected"; error: string };
+
+export function validateInferencePrompt(message: IncomingMessage): InferencePromptValidation {
+  if (typeof message.text !== "string" || message.text.trim().length === 0) return { status: "ignored" };
+  const beginsWithCommand = message.text.startsWith("/") || message.entities?.some((entity) => entity.type === "bot_command" && entity.offset === 0) === true;
+  if (beginsWithCommand) return { status: "ignored" };
+  if ([...message.text].length > MAX_USER_MESSAGE_CHARS) return { status: "rejected", error: USER_MESSAGE_TOO_LONG_TEXT };
+  return { status: "accepted", prompt: message.text };
+}
+
+export function getInferencePrompt(message: IncomingMessage): string | null {
+  const validation = validateInferencePrompt(message);
+  return validation.status === "accepted" ? validation.prompt : null;
+}
 export function splitTelegramMessage(text: string, limit = TELEGRAM_MESSAGE_LIMIT): string[] { if (!Number.isInteger(limit) || limit <= 0) throw new Error("Message limit must be a positive integer"); const chunks: string[] = []; let remaining = text; while (remaining.length > limit) { const window = remaining.slice(0, limit); let splitAt = window.lastIndexOf("\n"); splitAt = splitAt >= 0 ? splitAt + 1 : limit; if (splitAt > 1 && remaining.charCodeAt(splitAt - 1) >= 0xd800 && remaining.charCodeAt(splitAt - 1) <= 0xdbff && remaining.charCodeAt(splitAt) >= 0xdc00 && remaining.charCodeAt(splitAt) <= 0xdfff) splitAt -= 1; chunks.push(remaining.slice(0, splitAt)); remaining = remaining.slice(splitAt); } if (remaining.length > 0) chunks.push(remaining); return chunks; }
+
+export async function processTextMessage(request: TextMessageRequest): Promise<void> {
+  const validation = validateInferencePrompt(request.message);
+  if (validation.status === "ignored") return;
+  if (validation.status === "rejected") { await request.reply(validation.error); return; }
+  const prompt = validation.prompt;
+  const started = Date.now();
+  logEvent("bot", "chat_received", { prompt_chars: [...prompt].length });
+  try {
+    const response = await request.inference.request(request.conversationId, request.userId, prompt);
+    const chunks = splitTelegramMessage(response);
+    logEvent("bot", "chat_inference_completed", { response_chars: response.length, reply_parts: chunks.length, duration_ms: Date.now() - started });
+    for (const chunk of chunks) await request.reply(chunk);
+    logEvent("bot", "chat_reply_completed", { reply_parts: chunks.length, duration_ms: Date.now() - started });
+  } catch {
+    logEvent("bot", "chat_failed", { category: "inference_error", duration_ms: Date.now() - started });
+    await request.reply(INFERENCE_ERROR_TEXT);
+  }
+}
 
 export function validateUpload(filename: unknown, knownSize: unknown, maxBytes: number): { filename: string; fileType: DocumentFileType } {
   if (!isSafeDocumentFilename(filename)) throw new Error("Invalid document filename.");
@@ -94,7 +132,7 @@ export function createBot(token: string, allowedUserIds: ReadonlySet<string>, in
   bot.on("message:document", async (context) => {
     await processDocumentUpload({ token, userId: String(context.from!.id), fileId: context.message.document.file_id, filename: context.message.document.file_name, knownSize: context.message.document.file_size, inference, options: documentOptions, getRemotePath: async (fileId) => (await context.api.getFile(fileId)).file_path, reply: (text) => context.reply(text) });
   });
-  bot.on("message:text", async (context) => { const prompt = getInferencePrompt(context.message); if (prompt === null) return; const conversationId = String(context.chat.id); const userId = String(context.from!.id); const started = Date.now(); logEvent("bot", "chat_received", { prompt_chars: prompt.length }); try { const response = await inference.request(conversationId, userId, prompt); const chunks = splitTelegramMessage(response); logEvent("bot", "chat_inference_completed", { response_chars: response.length, reply_parts: chunks.length, duration_ms: Date.now() - started }); for (const chunk of chunks) await context.reply(chunk); logEvent("bot", "chat_reply_completed", { reply_parts: chunks.length, duration_ms: Date.now() - started }); } catch { logEvent("bot", "chat_failed", { category: "inference_error", duration_ms: Date.now() - started }); await context.reply(INFERENCE_ERROR_TEXT); } });
+  bot.on("message:text", async (context) => { await processTextMessage({ message: context.message, conversationId: String(context.chat.id), userId: String(context.from!.id), inference, reply: (text) => context.reply(text) }); });
   bot.catch(() => { console.error("Telegram update handling failed"); });
   return bot;
 }

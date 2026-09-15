@@ -110,3 +110,21 @@ Work autonomously unless genuinely blocked. At the end report only:
 2. key decisions or justified deviations from `Spec.md`;
 3. remaining risks or limitations;
 4. exact commands for type-checking, tests, evaluation, and manual startup.
+
+
+## LLM Testing
+
+Implement the testing and model-selection iteration defined in `LLM_TestingSpec.md`.
+
+Before editing, read the existing bot specification, `LLM_TestingSpec.md`, relevant source code, tests, and package/config files. Treat the existing bot specification as authoritative for product behavior and the new specification as authoritative for testing and evaluation. Inspect the repository first and adapt paths/names to its current structure; do not redesign working components.
+
+Implement the complete required scope, including offline Vitest coverage, the 12-case behavioral dataset, the isolated user-run Ollama benchmark, JSON/Markdown reporting, configuration, package scripts, `.gitignore`, `MODEL_EVALUATION.md`, and concise README updates. Keep the solution TypeScript-native and dependency-light. The training Python files are examples only; do not introduce Python, DeepEval, hard-coded hosts/models, or external judge APIs.
+
+Important execution constraint: write the tests and runner, but do not run tests, type checking, coverage, the bot, worker, Ollama, benchmarks, model pulls, or any external/network command. Do not make real model or Telegram calls. I will run the commands and send you the output if debugging is needed.
+
+At the end, provide:
+
+1. a concise summary of what changed;
+2. any necessary deviations from the specification and why;
+3. the exact commands I should run for offline verification and the live two-model benchmark;
+4. which `EVAL_MODELS` values I still need to choose/install, without installing them yourself.

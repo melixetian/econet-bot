@@ -5,9 +5,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getInferencePrompt,
   isAuthorizedSender,
+  MAX_USER_MESSAGE_CHARS,
+  processTextMessage,
   processDocumentUpload,
   splitTelegramMessage,
   TELEGRAM_MESSAGE_LIMIT,
+  USER_MESSAGE_TOO_LONG_TEXT,
+  validateInferencePrompt,
   validateUpload,
   type InferenceClient,
 } from "../src/bot.js";
@@ -30,6 +34,43 @@ describe("getInferencePrompt", () => {
     ],
   ])("ignores %s", (_description, message) => {
     expect(getInferencePrompt(message)).toBeNull();
+  });
+});
+
+describe("text input boundary", () => {
+  it.each(["", " \n\t "])("rejects empty input without worker or reply side effects", async (text) => {
+    const inference = { request: vi.fn() } as unknown as InferenceClient;
+    const reply = vi.fn();
+    await processTextMessage({ message: { text }, conversationId: "c", userId: "u", inference, reply });
+    expect(inference.request).not.toHaveBeenCalled();
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it("accepts exactly the Unicode code-point limit and forwards it unchanged", async () => {
+    const text = ` ${"😀".repeat(MAX_USER_MESSAGE_CHARS - 2)} `;
+    const inference = { request: vi.fn().mockResolvedValue("plain _*[]`\\ output") } as unknown as InferenceClient;
+    const reply = vi.fn().mockResolvedValue(undefined);
+    await processTextMessage({ message: { text }, conversationId: "c", userId: "u", inference, reply });
+    expect([...text]).toHaveLength(MAX_USER_MESSAGE_CHARS);
+    expect(inference.request).toHaveBeenCalledWith("c", "u", text);
+    expect(reply).toHaveBeenCalledWith("plain _*[]`\\ output");
+    expect(reply.mock.calls[0]).toHaveLength(1);
+  });
+
+  it("rejects one Unicode code point over the limit before the worker", async () => {
+    const inference = { request: vi.fn() } as unknown as InferenceClient;
+    const reply = vi.fn().mockResolvedValue(undefined);
+    await processTextMessage({ message: { text: "😀".repeat(MAX_USER_MESSAGE_CHARS + 1) }, conversationId: "c", userId: "u", inference, reply });
+    expect(inference.request).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith(USER_MESSAGE_TOO_LONG_TEXT);
+  });
+
+  it("preserves Markdown-like, emoji, backslash, and non-ASCII input", async () => {
+    const text = "  _*[]`\\ unmatched ** Привет 😀  ";
+    expect(validateInferencePrompt({ text })).toEqual({ status: "accepted", prompt: text });
+    const inference = { request: vi.fn().mockResolvedValue("ok") } as unknown as InferenceClient;
+    await processTextMessage({ message: { text }, conversationId: "c", userId: "u", inference, reply: vi.fn().mockResolvedValue(undefined) });
+    expect(inference.request).toHaveBeenCalledWith("c", "u", text);
   });
 });
 
