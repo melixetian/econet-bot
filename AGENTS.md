@@ -39,6 +39,13 @@ Commands are defined in `package.json`:
 - `npm run typecheck` — type-check without emitting files.
 - `npm test` — run the Vitest suite once. Agents must not run this command.
 - `npm run evaluate` — run deterministic RAG retrieval evaluation. Agents must not run it.
+- `npm run audit:benchmark -- --profile baseline|optimized --label <label>` — run the real local Ollama token benchmark. Agents must not run it.
+- `npm run audit:preflight` — validate fixtures and local Ollama before measurement. Agents must not run it.
+- `npm run audit:benchmark:pair -- --before <label> --after <label>` — run comparable profiles in one isolated cohort and save distinct logs/comparison. Agents must not run it.
+- `npm run audit:run` — run preflight and a fresh timestamp-labelled pair, then collect comparison, dashboard, and report artifacts even when acceptance fails. Agents must not run it.
+- `npm run audit:compare -- --before <label> --after <label>` — compare compatible benchmark results without model access.
+- `npm run audit:dashboard` — inspect privacy-safe local audit metrics without model access.
+- `npm run audit:report -- --before <label> --after <label> --out <path>` — generate the Markdown audit report.
 - `npm run build` — compile application sources to `dist/`.
 - `npm run dev` — run the TypeScript bot and its worker. Agents must not run it.
 - `npm start` — run the compiled bot and its worker. Agents must not run it.
@@ -47,7 +54,7 @@ Commands are defined in `package.json`:
 
 - Never read, print, expose, commit, or replace secrets from `.env`.
 - Use `.env.example` for documented configuration and test fixtures.
-- Never run tests or evaluation, start the Telegram bot, inference worker,
+- Never run tests, evaluation, token benchmarks, start the Telegram bot, inference worker,
   Ollama, or any other service, and never make real Telegram or Ollama requests.
 - Give the user the exact validation or run commands to execute. Diagnose only
   command output the user supplies, then make the smallest necessary correction.

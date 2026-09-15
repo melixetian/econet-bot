@@ -13,6 +13,12 @@ function pdf(text: string): Buffer { const stream = `BT /F1 12 Tf 72 720 Td (${t
 
 describe("document extraction", () => {
   it("extracts and normalizes TXT and Markdown", async () => { const root = directory(); const txt = join(root, "a.txt"); const md = join(root, "a.md"); writeFileSync(txt, "one\r\n\r\n\r\ntwo\0"); writeFileSync(md, "# Heading\n\nBody"); await expect(extractDocument(txt, "txt", 100)).resolves.toEqual([{ text: "one\n\ntwo" }]); await expect(extractDocument(md, "md", 100)).resolves.toEqual([{ text: "# Heading\n\nBody" }]); });
-  it("extracts DOCX and page-aware PDF fixtures", async () => { const root = directory(); const docxPath = join(root, "a.docx"); const pdfPath = join(root, "a.pdf"); writeFileSync(docxPath, await docx("DOCX marker")); writeFileSync(pdfPath, pdf("PDF marker")); expect((await extractDocument(docxPath, "docx", 1_000))[0]?.text).toContain("DOCX marker"); expect(await extractDocument(pdfPath, "pdf", 1_000)).toEqual([{ text: "PDF marker", pageNumber: 1 }]); });
+  it("extracts DOCX fixtures", async () => { const root = directory(); const path = join(root, "a.docx"); writeFileSync(path, await docx("DOCX marker")); expect((await extractDocument(path, "docx", 1_000))[0]?.text).toContain("DOCX marker"); });
+  it("extracts page-aware PDF fixtures", async () => {
+    const root = directory(); const path = join(root, "a.pdf"); writeFileSync(path, pdf("PDF marker"));
+    expect(await extractDocument(path, "pdf", 1_000)).toEqual([{ text: "PDF marker", pageNumber: 1 }]);
+    // pdfjs-dist is intentionally loaded only for PDFs. Its first ESM/worker
+    // load can take tens of seconds when all Vitest files transform in parallel.
+  }, 60_000);
   it("rejects corrupt, empty, and oversized extracted content", async () => { const root = directory(); const corrupt = join(root, "bad.pdf"); const empty = join(root, "empty.txt"); const large = join(root, "large.txt"); writeFileSync(corrupt, "not pdf"); writeFileSync(empty, " \n\0"); writeFileSync(large, "abcdef"); await expect(extractDocument(corrupt, "pdf", 100)).rejects.toMatchObject({ code: "document_parse_failed" }); await expect(extractDocument(empty, "txt", 100)).rejects.toMatchObject({ code: "document_empty" }); await expect(extractDocument(large, "txt", 5)).rejects.toMatchObject({ code: "extracted_text_too_large" }); });
 });

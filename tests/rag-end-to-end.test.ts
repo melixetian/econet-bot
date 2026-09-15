@@ -14,10 +14,10 @@ class RetrievalProvider implements InferenceProvider {
   calls = 0;
   async chat(messages: readonly ChatMessage[], tools: readonly ToolDefinition[]): Promise<ProviderResponse> {
     expect(tools.map((tool) => tool.function.name)).toEqual(["exec", "search_documents"]);
-    if (this.calls++ === 0) return { content: "", toolCalls: [{ id: "rag", name: "search_documents", arguments: { query: "launch date" } }] };
+    if (this.calls++ === 0) return { content: "", toolCalls: [{ id: "rag", name: "search_documents", arguments: { query: "launch date" } }], usage: null };
     const result = JSON.parse(messages.at(-1)!.content) as { results: Array<{ text: string; filename: string }> };
     expect(result.results[0]).toMatchObject({ filename: "launch.txt" });
-    return { content: "The launch is 17 November.\n\nSource: launch.txt, chunk #0", toolCalls: [] };
+    return { content: "The launch is 17 November.\n\nSource: launch.txt, chunk #0", toolCalls: [], usage: null };
   }
 }
 

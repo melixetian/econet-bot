@@ -35,6 +35,17 @@ export interface WorkerConfig {
   ragMaxContextChars: number;
   skillsDir: string;
   agentWorkspaceDir: string;
+  tokenAuditEnabled: boolean;
+  tokenAuditDbPath: string;
+  tokenAuditAgentId: string;
+  tokenAuditProfile: "baseline" | "optimized";
+  chatHistoryTokenBudget: number;
+  execModelOutputMaxChars: number;
+  ragModelContextMaxChars: number;
+  tokenAuditInputUsdPer1M: number;
+  tokenAuditCachedInputUsdPer1M: number;
+  tokenAuditOutputUsdPer1M: number;
+  tokenAuditReasoningUsdPer1M: number;
 }
 
 function readPositiveInteger(name: string, value: string | undefined, fallback: number): number {
@@ -44,11 +55,36 @@ function readPositiveInteger(name: string, value: string | undefined, fallback: 
   return parsed;
 }
 
+function readIntegerAtLeast(name: string, value: string | undefined, fallback: number, minimum: number): number {
+  const parsed = readPositiveInteger(name, value, fallback);
+  if (parsed < minimum) throw new Error(`${name} must be at least ${minimum}`);
+  return parsed;
+}
+
 function readNonNegativeNumber(name: string, value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${name} must be a non-negative number`);
   return parsed;
+}
+
+function readBoolean(name: string, value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be true or false`);
+}
+
+function readAuditProfile(value: string | undefined): "baseline" | "optimized" {
+  const profile = value?.trim() || "optimized";
+  if (profile !== "baseline" && profile !== "optimized") throw new Error("TOKEN_AUDIT_PROFILE must be baseline or optimized");
+  return profile;
+}
+
+function readAuditAgentId(value: string | undefined): string {
+  const agentId = value?.trim() || "econet-bot";
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(agentId)) throw new Error("TOKEN_AUDIT_AGENT_ID must be a non-secret label using letters, numbers, dot, underscore, or hyphen");
+  return agentId;
 }
 
 function readHttpUrl(value: string): string {
@@ -113,6 +149,17 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env): WorkerCo
     ragMaxContextChars: readPositiveInteger("RAG_MAX_CONTEXT_CHARS", env.RAG_MAX_CONTEXT_CHARS, 8_000),
     skillsDir: resolve(env.SKILLS_DIR?.trim() || "./skills"),
     agentWorkspaceDir: resolve(env.AGENT_WORKSPACE_DIR?.trim() || "./agent-workspace"),
+    tokenAuditEnabled: readBoolean("TOKEN_AUDIT_ENABLED", env.TOKEN_AUDIT_ENABLED, true),
+    tokenAuditDbPath: resolve(env.TOKEN_AUDIT_DB_PATH?.trim() || "./data/token-audit.sqlite"),
+    tokenAuditAgentId: readAuditAgentId(env.TOKEN_AUDIT_AGENT_ID),
+    tokenAuditProfile: readAuditProfile(env.TOKEN_AUDIT_PROFILE),
+    chatHistoryTokenBudget: readPositiveInteger("CHAT_HISTORY_TOKEN_BUDGET", env.CHAT_HISTORY_TOKEN_BUDGET, 1_600),
+    execModelOutputMaxChars: readIntegerAtLeast("EXEC_MODEL_OUTPUT_MAX_CHARS", env.EXEC_MODEL_OUTPUT_MAX_CHARS, 3_000, 256),
+    ragModelContextMaxChars: readPositiveInteger("RAG_MODEL_CONTEXT_MAX_CHARS", env.RAG_MODEL_CONTEXT_MAX_CHARS, 4_500),
+    tokenAuditInputUsdPer1M: readNonNegativeNumber("TOKEN_AUDIT_INPUT_USD_PER_1M", env.TOKEN_AUDIT_INPUT_USD_PER_1M, 0),
+    tokenAuditCachedInputUsdPer1M: readNonNegativeNumber("TOKEN_AUDIT_CACHED_INPUT_USD_PER_1M", env.TOKEN_AUDIT_CACHED_INPUT_USD_PER_1M, 0),
+    tokenAuditOutputUsdPer1M: readNonNegativeNumber("TOKEN_AUDIT_OUTPUT_USD_PER_1M", env.TOKEN_AUDIT_OUTPUT_USD_PER_1M, 0),
+    tokenAuditReasoningUsdPer1M: readNonNegativeNumber("TOKEN_AUDIT_REASONING_USD_PER_1M", env.TOKEN_AUDIT_REASONING_USD_PER_1M, 0),
     ...sharedDocumentConfig(env),
   };
 }

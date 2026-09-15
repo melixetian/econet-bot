@@ -1,0 +1,8 @@
+Compatibility: compatible
+before-20260915T185518Z: valid | success 10/13 | usage complete true
+after-20260915T185518Z: valid | success 10/13 | usage complete true
+Gross exact tokens: 27837 -> 24663 | reduction 11.40%
+Success-rate drop pp: 0.00
+Hypothetical cost: $0.000000 -> $0.000000 | reduction N/A
+Acceptance: FAIL
+- token_target_not_met
