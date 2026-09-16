@@ -38,7 +38,9 @@ Commands are defined in `package.json`:
 
 - `npm run typecheck` — type-check without emitting files.
 - `npm test` — run the Vitest suite once. Agents must not run this command.
+- `npm run test:offline` — explicit alias for the offline Vitest suite. Agents must not run it.
 - `npm run evaluate` — run deterministic RAG retrieval evaluation. Agents must not run it.
+- `npm run eval:models` — run the isolated behavioral benchmark against `EVAL_MODELS`. Agents must not run it.
 - `npm run audit:benchmark -- --profile baseline|optimized --label <label>` — run the real local Ollama token benchmark. Agents must not run it.
 - `npm run audit:preflight` — validate fixtures and local Ollama before measurement. Agents must not run it.
 - `npm run audit:benchmark:pair -- --before <label> --after <label>` — run comparable profiles in one isolated cohort and save distinct logs/comparison. Agents must not run it.

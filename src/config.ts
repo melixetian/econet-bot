@@ -1,5 +1,13 @@
 import { resolve } from "node:path";
 
+export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+export const DEFAULT_LLM_TIMEOUT_MS = 60_000;
+
+export interface OllamaChatConfig {
+  ollamaBaseUrl: string;
+  llmTimeoutMs: number;
+}
+
 export interface BotConfig {
   telegramBotToken: string;
   allowedTelegramUserIds: ReadonlySet<string>;
@@ -94,6 +102,13 @@ function readHttpUrl(value: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
+export function loadOllamaChatConfig(env: NodeJS.ProcessEnv = process.env): OllamaChatConfig {
+  return {
+    ollamaBaseUrl: readHttpUrl(env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL),
+    llmTimeoutMs: readPositiveInteger("LLM_TIMEOUT_MS", env.LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS),
+  };
+}
+
 function readAllowlist(value: string | undefined): ReadonlySet<string> {
   if (!value) throw new Error("ALLOWED_TELEGRAM_USER_IDS is required");
   const ids = value.split(",").map((id) => id.trim());
@@ -121,6 +136,7 @@ export function loadBotConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {
 }
 
 export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
+  const ollamaChat = loadOllamaChatConfig(env);
   const agentMaxSteps = readPositiveInteger("AGENT_MAX_STEPS", env.AGENT_MAX_STEPS, 5);
   if (agentMaxSteps > 10) throw new Error("AGENT_MAX_STEPS must be an integer from 1 to 10");
   const ragChunkSizeChars = readPositiveInteger("RAG_CHUNK_SIZE_CHARS", env.RAG_CHUNK_SIZE_CHARS, 1_600);
@@ -128,11 +144,11 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env): WorkerCo
   if (!Number.isInteger(ragChunkOverlapChars) || ragChunkOverlapChars < 0 || ragChunkOverlapChars >= ragChunkSizeChars) throw new Error("RAG_CHUNK_OVERLAP_CHARS must be an integer from 0 to less than RAG_CHUNK_SIZE_CHARS");
   return {
     inferenceProvider: env.INFERENCE_PROVIDER?.trim() || "ollama",
-    ollamaBaseUrl: readHttpUrl(env.OLLAMA_BASE_URL?.trim() || "http://127.0.0.1:11434"),
+    ollamaBaseUrl: ollamaChat.ollamaBaseUrl,
     ollamaModel: env.OLLAMA_MODEL?.trim() || "qwen3:1.7b",
     ollamaEmbeddingModel: env.OLLAMA_EMBEDDING_MODEL?.trim() || "embeddinggemma",
     ragEmbeddingDimension: readPositiveInteger("RAG_EMBEDDING_DIMENSION", env.RAG_EMBEDDING_DIMENSION, 768),
-    llmTimeoutMs: readPositiveInteger("LLM_TIMEOUT_MS", env.LLM_TIMEOUT_MS, 60_000),
+    llmTimeoutMs: ollamaChat.llmTimeoutMs,
     embeddingTimeoutMs: readPositiveInteger("EMBEDDING_TIMEOUT_MS", env.EMBEDDING_TIMEOUT_MS, 60_000),
     agentTimeoutMs: readPositiveInteger("AGENT_TIMEOUT_MS", env.AGENT_TIMEOUT_MS, 300_000),
     agentMaxSteps,

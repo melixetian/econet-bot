@@ -4,8 +4,8 @@ import type { WorkerConfig } from "../config.js";
 import type { SqliteHistory } from "../history/sqlite-history.js";
 import type { InferenceProvider, ToolCall } from "../inference/providers/provider.js";
 import type { RagService } from "../rag/service.js";
-import { EXEC_TOOL, executeToolCall } from "./tools/exec.js";
-import { executeSearchDocuments, SEARCH_DOCUMENTS_TOOL } from "./tools/search-documents.js";
+import { EXEC_TOOL, executeToolCall, validateExecToolCall } from "./tools/exec.js";
+import { executeSearchDocuments, SEARCH_DOCUMENTS_TOOL, validateSearchDocumentsToolCall } from "./tools/search-documents.js";
 import { logEvent } from "../logging.js";
 import { canonicalJson, ContextTracker, estimateCost, estimateTokens, utf8Bytes, type CategorizedMessage } from "../audit/metrics.js";
 import { compactExecOutput, compactOldToolResults, compactRagOverlap, selectHistory } from "../audit/optimizations.js";
@@ -183,7 +183,12 @@ export class Agent {
     let compacted = false;
     logEvent("worker", "tool_started", { step: turnNumber, tool: toolName });
     try {
-      content = duplicateSuccessful ? DUPLICATE_TOOL_RESULT
+      const validationError = call.name === "exec" ? validateExecToolCall(call)
+        : call.name === "search_documents" ? validateSearchDocumentsToolCall(call)
+          : "Unknown tool";
+      content = validationError
+        ? JSON.stringify({ ok: false, status: "error", error: validationError })
+        : duplicateSuccessful ? DUPLICATE_TOOL_RESULT
         : call.name === "search_documents"
           ? await executeSearchDocuments(call, userId, this.rag, signal)
           : await this.execExecutor(call, this.config.agentWorkspaceDir, this.config.execTimeoutMs, signal);

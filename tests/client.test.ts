@@ -14,4 +14,16 @@ describe("client", () => {
     worker.stdout.emit("data", '{"id":"a","ok":true,"type":"chat","text":"ok"}\n{"id":"b","ok":true,"type":"reset"}\n{"id":"c","ok":true,"type":"index_document","document":{"filename":"a.txt","chunkCount":1}}\n{"id":"d","ok":true,"type":"list_documents","documents":[{"filename":"a.txt","fileType":"txt","createdAt":"now"}]}\n{"id":"e","ok":true,"type":"delete_document","deleted":true}\n');
     await expect(chat).resolves.toBe("ok"); await expect(reset).resolves.toBeUndefined(); await expect(index).resolves.toEqual({ filename: "a.txt", chunkCount: 1 }); await expect(list).resolves.toHaveLength(1); await expect(remove).resolves.toBe(true); client.shutdown();
   });
+  it("preserves correlation when worker responses arrive out of order", async () => {
+    const worker = new FakeWorker();
+    const ids = ["first", "second"];
+    const client = new InferenceWorkerClient(() => worker, 1_000, 1_000, () => ids.shift()!);
+    const first = client.request("conversation-a", "user", "one");
+    const second = client.request("conversation-b", "user", "two");
+    worker.stdout.emit("data", '{"id":"second","ok":true,"type":"chat","text":"answer-two"}\n');
+    worker.stdout.emit("data", '{"id":"first","ok":true,"type":"chat","text":"answer-one"}\n');
+    await expect(first).resolves.toBe("answer-one");
+    await expect(second).resolves.toBe("answer-two");
+    client.shutdown();
+  });
 });

@@ -57,12 +57,19 @@ Set `TELEGRAM_BOT_TOKEN` and the mandatory comma-separated `ALLOWED_TELEGRAM_USE
 | `TOKEN_AUDIT_CACHED_INPUT_USD_PER_1M` | `0` | Notional cached-input rate |
 | `TOKEN_AUDIT_OUTPUT_USD_PER_1M` | `0` | Notional output rate |
 | `TOKEN_AUDIT_REASONING_USD_PER_1M` | `0` | Notional reasoning rate |
+| `EVAL_MODELS` | none | Live benchmark only: at least two distinct installed chat models |
+| `EVAL_REPETITIONS` | `1` | Live runs per case/model, from 1 to 5 |
+| `EVAL_TEMPERATURE` | `0` | Shared non-negative live benchmark temperature |
+| `EVAL_OUTPUT_DIR` | `./artifacts/model-evaluation` | Ignored JSON/Markdown report directory |
+| `EVAL_INCLUDE_OUTPUT_PREVIEWS` | `false` | Opt in to bounded, canary-redacted response previews |
 
 Changing the embedding model or dimension makes an existing index incompatible. Stop the app, remove or move `RAG_DB_PATH`, and re-upload documents; automatic re-embedding is intentionally not implemented.
 
 ## Behavior and architecture
 
 The Telegram and inference worker are separate long-lived processes connected by strictly validated JSONL over stdin/stdout. Telegram performs the sender allowlist check before commands, downloads, or worker calls. It derives `conversationId` from the chat and trusted document `userId` from the validated sender. The sequential worker owns conversation history, extraction, deterministic chunking, Ollama embeddings, SQLite/sqlite-vec, Skills, and the bounded model/tool loop.
+
+Text input is limited to 4,096 Unicode code points. Empty/whitespace-only input is ignored, over-limit input is rejected before inference, and accepted text is forwarded unchanged. Model replies use no Telegram parse mode, so Markdown-like characters are sent as plain message content.
 
 Upload one `.txt`, `.md`, `.docx`, or text-based `.pdf` document per update. The bot validates the safe basename and known size, downloads to a unique temporary path, indexes it, and always removes the temporary bytes. Original files are never retained. Filenames are case-sensitive and unique per user.
 
@@ -88,6 +95,20 @@ npm run evaluate
 ```
 
 `npm run evaluate` uses deterministic fake topic vectors and a temporary sqlite-vec database. Its six cases cover TXT, Markdown, DOCX, PDF source/page metadata, multiple documents, no-answer behavior, and cross-user isolation; it does not call Telegram, Ollama, or an LLM.
+
+`npm test` (or the explicit alias `npm run test:offline`) is fully offline. It includes the version-1, 12-case behavioral harness dataset at `tests/fixtures/llm-evaluation-cases.json`: four prompt-injection, four hallucination/no-answer, and four memory/reset cases. Fake providers, in-memory history, and fake tools test the harness; these results do not claim that a real model is good.
+
+The live behavioral benchmark is opt-in and separate from the default tests. First use `ollama list`, then manually install any missing candidates with `ollama pull <model>`. For a lightweight comparison with the existing `qwen3:1.7b`, `llama3.2:3b` is a roughly 2 GB tool-capable candidate. Run the two-model benchmark with separate parameters (the first `--` tells npm to forward the remaining arguments):
+
+```sh
+npm run eval:models -- --model_1 qwen3:1.7b --model_2 llama3.2:3b
+```
+
+`EVAL_MODELS="model-a,model-b" npm run eval:models` remains available for two or more candidates and automation. Explicit CLI model parameters take precedence over `EVAL_MODELS` and must be provided together with distinct values.
+
+It evaluates models sequentially with identical prompts, temperature, fake tools, and isolated in-memory histories. It calls only the configured Ollama chat endpoint; it does not pull models, contact Telegram, run shell commands, embed/search real documents, open production databases, or update `OLLAMA_MODEL`/`.env`. Generated `artifacts/model-evaluation/results.json` contains attempt records and aggregates; `report.md` contains the comparison and recommendation. Full outputs are omitted unless explicitly enabled, in which case only bounded canary-redacted previews are stored.
+
+Metrics include completed/pass/fail/error counts, passed/completed case rate, assertion rate, category rates, critical failures, canary leaks, p50/p95 complete-response latency, and Ollama output-token/token-per-second values when metadata exists. Eligibility requires zero critical failures, zero canary leaks, at most 10% errors, and at least 80% case pass rate. Eligible models are ranked by case rate, hallucination rate, lower p95 latency, then fewer average output tokens. See `MODEL_EVALUATION.md` for the exact method. String/regex scoring can miss valid paraphrases or shallow answers; Level 3 LLM-as-a-Judge and streaming TTFT are not included.
 
 Start in development:
 
